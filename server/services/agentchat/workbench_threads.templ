@@ -1,9 +1,6 @@
 package agentchat
 
-import (
-	"github.com/CoreyCole/vamos/server/layouts/workbench"
-	"github.com/CoreyCole/vamos/server/services/agenthome"
-)
+import "github.com/CoreyCole/vamos/server/layouts/workbench"
 
 templ WorkbenchThreadList(groups []WorkbenchThreadGroup, selectedID, artifact string) {
 	<div class="flex h-full min-h-0 flex-col bg-background" data-signals="{threadSearch: ''}">
@@ -49,24 +46,6 @@ templ WorkbenchThreadList(groups []WorkbenchThreadGroup, selectedID, artifact st
 						}
 					</div>
 				</details>
-			}
-		</nav>
-	</div>
-}
-
-templ RootThreadsIndex(rows []RootThreadPreview) {
-	<div id="root-threads-index" class="flex h-full min-h-0 flex-col bg-background" data-testid="root-threads-index">
-		<nav class="min-h-0 flex-1 overflow-y-auto" aria-label="Threads">
-			for _, row := range rows {
-				@agenthome.ConversationRow(agenthome.ConversationRowArgs{
-					Href:        row.Href,
-					Title:       row.Author,
-					Preview:     row.Preview,
-					Time:        row.When,
-					Initial:     row.Initial,
-					AccentClass: row.AvatarClass,
-					TestID:      "root-thread-row",
-				})
 			}
 		</nav>
 	</div>

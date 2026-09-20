@@ -255,15 +255,6 @@ func (s stubWorkbenchThreads) EnsureFreeformLandThread(
 	return s.threadID, nil
 }
 
-func (s stubWorkbenchThreads) RenderRootThreadsIndex(
-	ctx context.Context,
-	userEmail string,
-) (templ.Component, bool, error) {
-	_ = ctx
-	_ = userEmail
-	return nil, false, nil
-}
-
 func (s stubWorkbenchThreads) RenderSharedThreadChat(
 	ctx context.Context,
 	threadID, userEmail string,

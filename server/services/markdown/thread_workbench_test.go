@@ -26,7 +26,6 @@ type threadWorkbenchTestRenderer struct {
 	lastFindDoc    string
 	ensureID       string
 	lastEnsureDoc  string
-	rootIndex      bool
 	ensureFreeform bool
 }
 
@@ -82,19 +81,6 @@ func (r *threadWorkbenchTestRenderer) EnsureFreeformLandThread(
 		return r.ensureID, nil
 	}
 	return "land-chat", nil
-}
-
-func (r *threadWorkbenchTestRenderer) RenderRootThreadsIndex(
-	context.Context,
-	string,
-) (templ.Component, bool, error) {
-	if !r.rootIndex {
-		return nil, false, nil
-	}
-	return templ.Raw(
-		`<div id="root-threads-index" data-testid="root-threads-index">` +
-			`<a href="/threads/land-chat" data-testid="root-thread-row">what is in your context?</a></div>`,
-	), true, nil
 }
 
 func (r *threadWorkbenchTestRenderer) RenderSharedThreadChat(
@@ -275,7 +261,7 @@ func TestServeThreadsIndexListsRootThreads(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := &threadWorkbenchTestRenderer{rootIndex: true}
+	r := &threadWorkbenchTestRenderer{}
 	svc.WithWorkbenchThreadRenderer(r)
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(httptest.NewRequest("GET", "/threads", nil), rec)

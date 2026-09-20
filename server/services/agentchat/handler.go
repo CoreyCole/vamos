@@ -798,10 +798,19 @@ func (h *Handler) StreamEmbeddedFreeform(c echo.Context) error {
 		Reason:    "embedded-freeform-stream",
 	})
 
+	workbenchV2 := c.QueryParam("workbench_v2") == "1"
 	since := parseSince(c.QueryParam("since"))
 	currentCursor := h.service.CurrentCursor(threadID)
 	if since < currentCursor {
-		if err := h.patchEmbeddedFreeformChatPanel(c, sse, userEmail); err != nil {
+		if workbenchV2 {
+			if err := h.patchEmbeddedFreeformLiveTranscript(
+				c,
+				sse,
+				userEmail,
+			); err != nil {
+				return err
+			}
+		} else if err := h.patchEmbeddedFreeformChatPanel(c, sse, userEmail); err != nil {
 			return err
 		}
 		since = h.service.CurrentCursor(threadID)
@@ -911,7 +920,11 @@ func (h *Handler) StreamEmbeddedThread(c echo.Context) error {
 	since := parseSince(c.QueryParam("since"))
 	currentCursor := h.service.CurrentCursor(threadID)
 	if since < currentCursor {
-		if err := patchPanel(); err != nil {
+		if workbenchV2 {
+			if err := patchTranscript(); err != nil {
+				return err
+			}
+		} else if err := patchPanel(); err != nil {
 			return err
 		}
 		since = h.service.CurrentCursor(threadID)
@@ -985,16 +998,18 @@ func (h *Handler) StreamEmbeddedWorkspace(c echo.Context) error {
 		Reason:    "embedded-workspace-stream",
 	})
 
+	workbenchV2 := c.QueryParam("workbench_v2") == "1"
 	since := parseSince(c.QueryParam("since"))
 	currentCursor := h.service.CurrentCursor(workspaceID)
 	if workspace.NeedsCatchup(since, currentCursor) {
-		// Catchup may full-panel once (reconnect SoT rebuild). Incremental
-		// signals must not MessagesPane-nest / empty-REPLACE live.
-		if err := h.patchEmbeddedChatPanel(
-			c,
-			sse,
-			h.embeddedPatchInput(c, userEmail),
-		); err != nil {
+		input := h.embeddedPatchInput(c, userEmail)
+		// V2 lands do not mount #doc-right-chat-panel. Catchup patches the
+		// live transcript only. Legacy thoughts rail still full-panels.
+		if workbenchV2 {
+			if err := h.patchEmbeddedChatLiveTranscript(c, sse, input); err != nil {
+				return err
+			}
+		} else if err := h.patchEmbeddedChatPanel(c, sse, input); err != nil {
 			return err
 		}
 		since = h.service.CurrentCursor(workspaceID)

@@ -56,10 +56,6 @@ type WorkbenchThreadRenderer interface {
 		ctx context.Context,
 		userEmail string,
 	) (string, error)
-	RenderRootThreadsIndex(
-		ctx context.Context,
-		userEmail string,
-	) (templ.Component, bool, error)
 	RenderSharedThreadChat(
 		ctx context.Context,
 		threadID, userEmail string,

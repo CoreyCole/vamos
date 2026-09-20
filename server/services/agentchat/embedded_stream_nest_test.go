@@ -50,10 +50,13 @@ func setupEmbeddedWorkspaceStreamFixture(t *testing.T) (*Service, *Handler, stri
 	); err != nil {
 		t.Fatal(err)
 	}
-	if err := queries.AttachThreadToWorkspace(t.Context(), db.AttachThreadToWorkspaceParams{
-		ID:          "thread_1",
-		WorkspaceID: nullString("workspace_1"),
-	}); err != nil {
+	if err := queries.AttachThreadToWorkspace(
+		t.Context(),
+		db.AttachThreadToWorkspaceParams{
+			ID:          "thread_1",
+			WorkspaceID: nullString("workspace_1"),
+		},
+	); err != nil {
 		t.Fatal(err)
 	}
 	return service, NewHandler(service, nil), "workspace_1"
@@ -91,7 +94,11 @@ func waitEmbeddedWorkspaceSubscriber(t *testing.T, service *Service, workspaceID
 	t.Fatal("stream did not subscribe")
 }
 
-func waitStreamBodyContains(t *testing.T, rec *httptest.ResponseRecorder, needle string) string {
+func waitStreamBodyContains(
+	t *testing.T,
+	rec *httptest.ResponseRecorder,
+	needle string,
+) string {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
@@ -211,13 +218,75 @@ func TestStreamEmbeddedWorkspacePatchLiveTranscriptIsLiveOnly(t *testing.T) {
 
 func TestStreamEmbeddedWorkspaceCatchupMayFullPanel(t *testing.T) {
 	service, handler, workspaceID := setupEmbeddedWorkspaceStreamFixture(t)
-	service.notifier.NotifyWorkspaceResource(workspaceID) // advance cursor so since=0 catchup fires
+	service.notifier.NotifyWorkspaceResource(
+		workspaceID,
+	) // advance cursor so since=0 catchup fires
 	cancel, rec, done := startEmbeddedWorkspaceStream(t, handler, workspaceID, "0")
 	defer cancel()
 	body := waitStreamBodyContains(t, rec, "doc-right-chat-panel")
 	if !strings.Contains(body, "agent-chat-live-transcript") {
 		t.Fatalf("catchup panel should include live region shell:\n%s", body)
 	}
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("stream did not stop")
+	}
+}
+
+func TestStreamEmbeddedWorkspaceCatchupV2DoesNotPatchPanel(t *testing.T) {
+	service, handler, workspaceID := setupEmbeddedWorkspaceStreamFixture(t)
+	service.notifier.NotifyWorkspaceResource(workspaceID)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	target := "/thoughts/chat/workspace/" + workspaceID +
+		"/stream?thread=thread_1&since=0&workbench_v2=1"
+	req := httptest.NewRequest(http.MethodGet, target, nil).WithContext(ctx)
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(req, rec)
+	c.SetPath("/thoughts/chat/workspace/:workspace_id/stream")
+	c.SetParamNames("workspace_id")
+	c.SetParamValues(workspaceID)
+	c.Set("user_email", "owner@example.com")
+	done := make(chan error, 1)
+	go func() { done <- handler.StreamEmbeddedWorkspace(c) }()
+	body := waitStreamBodyContains(t, rec, "agent-chat-live-transcript")
+	assertNoPanelLiveNest(t, body, "workspace v2 catchup")
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("stream did not stop")
+	}
+}
+
+func TestStreamEmbeddedThreadCatchupV2DoesNotPatchPanel(t *testing.T) {
+	service, handler, _ := setupEmbeddedWorkspaceStreamFixture(t)
+	service.notifier.NotifyLiveTranscript("thread_1")
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/thoughts/chat/thread/thread_1/stream?since=0&workbench_v2=1",
+		nil,
+	).WithContext(ctx)
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(req, rec)
+	c.SetPath("/thoughts/chat/thread/:thread_id/stream")
+	c.SetParamNames("thread_id")
+	c.SetParamValues("thread_1")
+	c.Set("user_email", "owner@example.com")
+	done := make(chan error, 1)
+	go func() { done <- handler.StreamEmbeddedThread(c) }()
+	body := waitStreamBodyContains(t, rec, "agent-chat-live-transcript")
+	assertNoPanelLiveNest(t, body, "thread v2 catchup")
 	cancel()
 	select {
 	case err := <-done:

@@ -126,15 +126,6 @@ func (r *routingChatRenderer) EnsureFreeformLandThread(
 	return "", nil
 }
 
-func (r *routingChatRenderer) RenderRootThreadsIndex(
-	ctx context.Context,
-	userEmail string,
-) (templ.Component, bool, error) {
-	_ = ctx
-	_ = userEmail
-	return nil, false, nil
-}
-
 func (r *routingChatRenderer) RenderSharedThreadChat(
 	ctx context.Context,
 	threadID, userEmail string,
