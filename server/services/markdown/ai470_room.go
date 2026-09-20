@@ -79,13 +79,21 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 	commentsComp := WorkbenchUnavailable("Select an artifact to view comments.")
 	chatOpen := false
 	includePlanChat := kind != agenthome.KindPlan
+	// View Chat from thoughts must leave the artifact open even if the user
+	// previously hid details (wb2_artifact_open=0). Close details still works
+	// after landing; this only forces open on plan+artifact entry.
+	forceArtifactOpen := kind == agenthome.KindPlan && hasArtifact
+	artifactChromeOpen := workbench.ArtifactOpenFromRequest(c.Request())
+	if forceArtifactOpen {
+		artifactChromeOpen = true
+	}
 
 	if threadID == "" {
 		chatBody := WorkbenchUnavailable("No shared thread mapped for this room yet.")
 		chatComp = chatColumnForAI470Room(
 			kind,
 			threadsOpen,
-			workbench.ArtifactOpenFromRequest(c.Request()),
+			artifactChromeOpen,
 			roomTitle,
 			chatBody,
 			BuildChatHeaderOverflow(artifactPage, artifactDoc, includePlanChat),
@@ -116,7 +124,7 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		chatComp = chatColumnForAI470Room(
 			kind,
 			threadsOpen,
-			workbench.ArtifactOpenFromRequest(c.Request()),
+			artifactChromeOpen,
 			roomTitle,
 			chat,
 			BuildChatHeaderOverflow(artifactPage, artifactDoc, includePlanChat),
@@ -136,7 +144,11 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 	artifactOpen := hasArtifact || kind == agenthome.KindPlan
 	if viewport.IsDesktop() {
 		// Class B cookie↔SSR (Threads-reopen pattern); default open when missing.
-		artifactOpen = workbench.ArtifactOpenFromRequest(c.Request())
+		artifactOpen = artifactChromeOpen
+	}
+	if forceArtifactOpen {
+		artifactOpen = true
+		workbench.WriteArtifactOpenCookie(c.Response(), true)
 	}
 	state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     userEmail,
@@ -397,6 +409,11 @@ func (s *Service) ai470RoomTitle(
 		agent, err := s.roster.Get(id)
 		if err == nil {
 			return agenthome.RosterBotTitle(agent.Name, agent.Slug)
+		}
+	}
+	if kind == agenthome.KindPlan && id != "" {
+		if h := workbench.HumanizePlanRoomID(id); h != "" {
+			return h
 		}
 	}
 	if id != "" {

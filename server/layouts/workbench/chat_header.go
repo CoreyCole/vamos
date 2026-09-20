@@ -73,6 +73,9 @@ func ParseChatHeaderTitle(title string) ChatHeaderTitleParts {
 	}
 	m := chatHeaderPlanSlugRE.FindStringSubmatch(title)
 	if m == nil {
+		if display := HumanizePlanRoomID(title); display != title {
+			return ChatHeaderTitleParts{Display: display}
+		}
 		return ChatHeaderTitleParts{Display: title}
 	}
 	year, _ := strconv.Atoi(m[1])
@@ -95,6 +98,34 @@ func ParseChatHeaderTitle(title string) ChatHeaderTitleParts {
 		Display:  display,
 		Datetime: fmt.Sprintf("%s · %02d:%02d", t.Format("Jan 2, 2006"), hour, min),
 	}
+}
+
+// HumanizePlanRoomID turns docs--vamos path-separator room ids into a
+// readable title (Docs / Vamos). Timestamp plan slugs stay unchanged here;
+// ParseChatHeaderTitle still owns YYYY-MM-DD_HH-MM-SS_* display.
+func HumanizePlanRoomID(id string) string {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return ""
+	}
+	if chatHeaderPlanSlugRE.MatchString(id) {
+		return id
+	}
+	if !strings.Contains(id, "--") {
+		return id
+	}
+	parts := strings.Split(id, "--")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		h := humanizeChatHeaderSlug(p)
+		if h != "" {
+			out = append(out, h)
+		}
+	}
+	if len(out) == 0 {
+		return id
+	}
+	return strings.Join(out, " / ")
 }
 
 func humanizeChatHeaderSlug(slug string) string {

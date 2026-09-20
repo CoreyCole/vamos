@@ -438,6 +438,97 @@ func TestAI470RoomTitleUsesLiveAgentName(t *testing.T) {
 	); got != "alpha" {
 		t.Fatalf("plan title fixture leftover = %q", got)
 	}
+	if got := svc.ai470RoomTitle(
+		context.Background(),
+		agenthome.KindPlan,
+		"docs--vamos",
+	); got != "Docs / Vamos" {
+		t.Fatalf("docs room title = %q", got)
+	}
+	if got := svc.ai470RoomTitle(
+		context.Background(),
+		agenthome.KindPlan,
+		"docs--vamos--shots",
+	); got != "Docs / Vamos / Shots" {
+		t.Fatalf("nested docs room title = %q", got)
+	}
+	slug := "2026-09-08_10-10-54_agent-memory-observable-context"
+	if got := svc.ai470RoomTitle(
+		context.Background(),
+		agenthome.KindPlan,
+		slug,
+	); got != slug {
+		t.Fatalf("timestamp plan id should stay raw for header parse = %q", got)
+	}
+}
+
+func TestServeAI470RoomForcesArtifactOpenOnPlanViewChat(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	plan := filepath.Join(root, "creative-mode-agent", "plans", "real-plan")
+	mustMkdirAll(t, plan)
+	mustWriteFile(t, filepath.Join(plan, "design.md"), []byte("# Real plan\n"))
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	renderer := &threadWorkbenchTestRenderer{
+		findID:        "thread-real",
+		threadPlanDir: "thoughts/creative-mode-agent/plans/real-plan",
+	}
+	svc.WithWorkbenchThreadRenderer(renderer)
+
+	artifact := "thoughts/creative-mode-agent/plans/real-plan/design.md"
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/rooms/plan/real-plan?artifact="+url.QueryEscape(artifact),
+		http.NoBody,
+	)
+	req.Header.Set("X-Vamos-Viewport-Class", "desktop-full")
+	req.AddCookie(&http.Cookie{Name: "wb2_artifact_open", Value: "0"})
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(req, rec)
+	c.SetParamNames("kind", "id")
+	c.SetParamValues("plan", "real-plan")
+	c.Set("user_email", "t@example.com")
+	if err := svc.ServeAI470Room(c); err != nil {
+		t.Fatal(err)
+	}
+	body := rec.Body.String()
+	needle := `&#34;workbenchV2Artifact&#34;:{&#34;ratio&#34;`
+	idx := strings.Index(body, needle)
+	if idx < 0 {
+		idx = strings.Index(body, `"workbenchV2Artifact":{"ratio"`)
+	}
+	if idx < 0 {
+		t.Fatalf("missing artifact region signal: %s", body)
+	}
+	end := idx + 80
+	if end > len(body) {
+		end = len(body)
+	}
+	window := body[idx:end]
+	if !strings.Contains(window, `visible&#34;:true`) &&
+		!strings.Contains(window, `"visible":true`) {
+		t.Fatalf("plan View Chat must keep artifact open despite cookie=0: %s", window)
+	}
+	if !strings.Contains(body, `id="thread-chat"`) {
+		t.Fatalf("missing chat: %s", body)
+	}
+	found := false
+	for _, ck := range rec.Result().Cookies() {
+		if ck.Name == "wb2_artifact_open" && ck.Value == "1" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf(
+			"expected Set-Cookie wb2_artifact_open=1, got %#v",
+			rec.Result().Cookies(),
+		)
+	}
 }
 
 func TestLiveRosterListsPlanDirsFromIndex(t *testing.T) {

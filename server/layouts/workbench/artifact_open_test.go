@@ -24,6 +24,17 @@ func TestArtifactOpenFromRequest(t *testing.T) {
 	}
 }
 
+func TestWriteArtifactOpenCookie(t *testing.T) {
+	t.Parallel()
+	rec := httptest.NewRecorder()
+	WriteArtifactOpenCookie(rec, true)
+	cookies := rec.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].Name != ArtifactOpenCookie ||
+		cookies[0].Value != "1" {
+		t.Fatalf("cookies = %#v", cookies)
+	}
+}
+
 func TestArtifactHideShowActionsWriteCookie(t *testing.T) {
 	t.Parallel()
 	hide := ArtifactHideClickAction()

@@ -45,3 +45,24 @@ func TestParseChatHeaderTitleInvalidDate(t *testing.T) {
 		t.Fatalf("invalid date must pass through: %+v", got)
 	}
 }
+
+func TestParseChatHeaderTitleDocsRoomID(t *testing.T) {
+	got := ParseChatHeaderTitle("docs--vamos")
+	if got.Display != "Docs / Vamos" || got.Datetime != "" {
+		t.Fatalf("docs room: %+v", got)
+	}
+	nested := ParseChatHeaderTitle("docs--vamos--shots")
+	if nested.Display != "Docs / Vamos / Shots" {
+		t.Fatalf("nested docs room: %+v", nested)
+	}
+}
+
+func TestHumanizePlanRoomID(t *testing.T) {
+	if got := HumanizePlanRoomID("docs--vamos"); got != "Docs / Vamos" {
+		t.Fatalf("got %q", got)
+	}
+	slug := "2026-09-08_10-10-54_agent-memory-observable-context"
+	if got := HumanizePlanRoomID(slug); got != slug {
+		t.Fatalf("timestamp slug must stay raw for ParseChatHeaderTitle: %q", got)
+	}
+}
