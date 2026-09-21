@@ -88,12 +88,12 @@ templ ArtifactReopenControl(artifactOpen bool, controlID string) {
 			<span
 				aria-hidden="true"
 				class={ "font-mono text-[11px] leading-none", templ.KV("hidden", artifactOpen) }
-				data-show="!$workbench.regions.workbenchV2Artifact.visible"
+				data-class="{ hidden: $workbench.regions.workbenchV2Artifact.visible }"
 			>&lt;&lt;</span>
 			<span
 				aria-hidden="true"
 				class={ "font-mono text-[11px] leading-none", templ.KV("hidden", !artifactOpen) }
-				data-show="$workbench.regions.workbenchV2Artifact.visible"
+				data-class="{ hidden: !$workbench.regions.workbenchV2Artifact.visible }"
 			>&gt;&gt;</span>
 			<span class="sr-only">Details</span>
 		</button>

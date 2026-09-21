@@ -399,7 +399,7 @@ func ArtifactReopenControl(artifactOpen bool, controlID string) templ.Component 
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "\" data-show=\"!$workbench.regions.workbenchV2Artifact.visible\">&lt;&lt;</span> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "\" data-class=\"{ hidden: $workbench.regions.workbenchV2Artifact.visible }\">&lt;&lt;</span> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -421,7 +421,7 @@ func ArtifactReopenControl(artifactOpen bool, controlID string) templ.Component 
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "\" data-show=\"$workbench.regions.workbenchV2Artifact.visible\">&gt;&gt;</span> <span class=\"sr-only\">Details</span></button></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "\" data-class=\"{ hidden: !$workbench.regions.workbenchV2Artifact.visible }\">&gt;&gt;</span> <span class=\"sr-only\">Details</span></button></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

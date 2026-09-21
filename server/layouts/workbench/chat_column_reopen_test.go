@@ -173,6 +173,18 @@ func TestChatColumnArtifactToggleVisibleWhenOpen(t *testing.T) {
 	if !strings.Contains(slice, "&gt;&gt;") {
 		t.Fatalf("open details toggle must show >> left of kebab: %s", slice)
 	}
+	if !strings.Contains(
+		slice,
+		`data-class="{ hidden: $workbench.regions.workbenchV2Artifact.visible }"`,
+	) {
+		t.Fatalf("<< must toggle hidden via data-class, not leftover hidden: %s", slice)
+	}
+	if strings.Contains(slice, "data-show=") {
+		t.Fatalf(
+			"<< / >> must not use data-show (does not clear Tailwind hidden): %s",
+			slice,
+		)
+	}
 }
 
 func TestChatColumnShareOverflowMenu(t *testing.T) {
