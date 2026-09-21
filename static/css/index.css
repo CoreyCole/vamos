@@ -698,9 +698,18 @@ html[data-wb2-vt-nav="thread-switch"] #workbench-v2-chat {
   border-style: none;
   border-width: 0;
 }
-/* Handles sit between regions (w-0); border-r on every region except the last paints hairlines. */
-#workbench-regions > .workbench-region:not(:last-child) {
+/* Handles sit between regions (w-0). Do not put border-right on chat/comments:
+   closed #workbench-v2-artifact is still last child, so chat :not(:last-child)
+   would leave a 1px window-edge hairline and shift the kebab. Chat|details
+   hairline lives on artifact border-left (paints only when displayed). */
+#workbench-regions
+  > .workbench-region:not(:last-child):not(#workbench-v2-chat):not(
+    #workbench-v2-comments
+  ) {
   border-right: 1px solid hsl(var(--border));
+}
+#workbench-regions > #workbench-v2-artifact {
+  border-left: 1px solid hsl(var(--border));
 }
 
 /* Workbench V2 roster + chat-column list-row chrome (shared — not inline). */

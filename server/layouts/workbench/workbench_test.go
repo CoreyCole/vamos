@@ -2214,16 +2214,35 @@ func TestWorkbenchV2FlushChromeCSS(t *testing.T) {
 		t.Skip("index.css not found from test cwd")
 	}
 	out := string(b)
+	compact := strings.Join(strings.Fields(out), "")
 	for _, want := range []string{
 		"AI-470 flush chrome",
 		"#workbench-root",
 		"padding: 0 !important",
-		"#workbench-regions > .workbench-region:not(:last-child)",
 		"border-right: 1px solid",
+		"#workbench-regions > #workbench-v2-artifact",
+		"border-left: 1px solid",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("index.css missing flush rule %q", want)
 		}
+	}
+	for _, want := range []string{
+		":not(#workbench-v2-chat)",
+		":not(#workbench-v2-comments)",
+	} {
+		if !strings.Contains(compact, want) {
+			t.Fatalf("index.css missing flush rule %q", want)
+		}
+	}
+	if strings.Contains(compact, ".workbench-region:not(:last-child){border-right") {
+		t.Fatal("chat must not keep :not(:last-child) border-right (closed details 1px)")
+	}
+	if !strings.Contains(compact, ":not(#workbench-v2-chat)") ||
+		!strings.Contains(compact, "#workbench-v2-artifact{border-left") {
+		t.Fatal(
+			"closed details hairline must be artifact border-left, not chat border-right",
+		)
 	}
 }
 
