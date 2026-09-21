@@ -297,7 +297,7 @@ func TestServeAI470RoomProfileViewListsDiskFiles(t *testing.T) {
 	}
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(
-		httptest.NewRequest(http.MethodGet, "/rooms/dm/nova?view=profile", nil),
+		httptest.NewRequest(http.MethodGet, "/rooms/dm/nova", nil),
 		rec,
 	)
 	c.SetParamNames("kind", "id")
@@ -306,13 +306,104 @@ func TestServeAI470RoomProfileViewListsDiskFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := rec.Body.String()
-	for _, want := range []string{"AGENTS.md", "MEMORY.md", `id="agent-profile-files"`} {
+	for _, want := range []string{
+		"AGENTS.md", "MEMORY.md", `id="agent-profile-pane"`, `id="agent-profile-files"`,
+	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("missing %q: %s", want, body)
 		}
 	}
 	if strings.Contains(body, "USER.md") {
 		t.Fatalf("invented missing USER.md: %s", body)
+	}
+	if strings.Contains(body, `id="thread-artifact-document"`) {
+		t.Fatalf("bot default used ThreadArtifactPane: %s", body)
+	}
+}
+
+func TestServeAI470RoomArtifactQueryWinsOverBotMemory(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	mustMkdirAll(t, filepath.Join(root, "docs"))
+	mustWriteFile(t, filepath.Join(root, "docs", "note.md"), []byte("# Note\n"))
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{})
+	if err := seedBotHomeTree(root, "nova", "Nova"); err != nil {
+		t.Fatal(err)
+	}
+	artifact := "thoughts/docs/note.md"
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(
+		httptest.NewRequest(
+			http.MethodGet,
+			"/rooms/dm/nova?artifact="+url.QueryEscape(artifact),
+			nil,
+		),
+		rec,
+	)
+	c.SetParamNames("kind", "id")
+	c.SetParamValues("dm", "nova")
+	if err := svc.ServeAI470Room(c); err != nil {
+		t.Fatal(err)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `id="thread-artifact-document"`) {
+		t.Fatalf("missing ThreadArtifactPane: %s", body)
+	}
+	if strings.Contains(body, `id="agent-profile-pane"`) {
+		t.Fatalf("?artifact= lost to memory pane: %s", body)
+	}
+}
+
+func TestServeThreadBotScopedShowsMemoryPane(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	mustMkdirAll(t, filepath.Join(root, "owner", "plans", "alpha"))
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "agents.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dbSvc.Close() })
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithQueries(dbSvc.Queries)
+	withTestRoster(t, svc)
+	nova, err := svc.createAgent(context.Background(), createAgentInput{
+		Slug: "nova", Name: "Nova", UserEmail: "t@example.com",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	threadID, err := svc.ensureBotHomeThread(context.Background(), nova, "t@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{})
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(
+		httptest.NewRequest(http.MethodGet, "/threads/"+threadID, nil),
+		rec,
+	)
+	c.SetParamNames("threadID")
+	c.SetParamValues(threadID)
+	c.Set("user_email", "t@example.com")
+	if err := svc.ServeThread(c); err != nil {
+		t.Fatal(err)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `id="agent-profile-pane"`) {
+		t.Fatalf("missing memory pane: %s", body)
+	}
+	if strings.Contains(body, "Select a thread to view an artifact.") {
+		t.Fatalf("placeholder artifact: %s", body)
 	}
 }
 

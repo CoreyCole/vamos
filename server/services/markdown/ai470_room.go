@@ -240,7 +240,8 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		}
 	}
 
-	if profileView(c) && kind == agenthome.KindDM {
+	// Bot details default to on-disk memory files; explicit ?artifact= wins.
+	if kind == agenthome.KindDM && !hasArtifact {
 		artifactComp = s.agentProfilePane(kind, id, c.QueryParam("file"))
 		_ = mobileActiveRegionForRoom("profile")
 	}

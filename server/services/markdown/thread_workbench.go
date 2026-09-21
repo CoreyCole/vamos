@@ -373,6 +373,10 @@ func (s *Service) ServeThread(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
+	sel := s.rosterSelectionForLiveThread(c.Request().Context(), threadID)
+	if sel.Kind == agenthome.KindDM && !c.Request().URL.Query().Has("artifact") {
+		artifact = s.agentProfilePane(sel.Kind, sel.ID, c.QueryParam("file"))
+	}
 	viewport := viewportClassForRequest(c)
 	_ = threads // AI-470 converge: left rail is roster, not thread list.
 	chatOpen, commentsOpen := chatCommentsOpen(c.Request(), true)
@@ -395,7 +399,7 @@ func (s *Service) ServeThread(c echo.Context) error {
 		Threads: agenthome.RosterRail(
 			s.liveRoster(
 				c.Request().Context(),
-				s.rosterSelectionForLiveThread(c.Request().Context(), threadID),
+				sel,
 			),
 		),
 		Chat: chatColumn(
