@@ -154,6 +154,10 @@ func (s *Service) resolveThreadArtifact(
 		artifact, explicit, err := optionalThreadArtifact(rawDoc)
 		return artifact, explicit, err
 	}
+	if strings.TrimSpace(rawDoc) != "" {
+		artifact, explicit, err := optionalThreadArtifact(rawDoc)
+		return artifact, explicit, err
+	}
 	if strings.TrimSpace(planDir) == "" {
 		return "", false, nil
 	}
@@ -365,17 +369,18 @@ func (s *Service) ServeThread(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	sel := s.rosterSelectionForLiveThread(c.Request().Context(), threadID)
+	artifactQuery := c.QueryParam("artifact")
+	if sel.Kind == agenthome.KindDM && !c.Request().URL.Query().Has("artifact") {
+		artifactQuery = s.thoughtsBotHomeArtifactPath(sel.ID)
+	}
 	artifact, comments, artifactPage, artifactDoc, err := s.threadArtifactAndComments(
 		c,
 		threadID,
-		c.QueryParam("artifact"),
+		artifactQuery,
 	)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	sel := s.rosterSelectionForLiveThread(c.Request().Context(), threadID)
-	if sel.Kind == agenthome.KindDM && !c.Request().URL.Query().Has("artifact") {
-		artifact = s.agentProfilePane(sel.Kind, sel.ID, c.QueryParam("file"))
 	}
 	viewport := viewportClassForRequest(c)
 	_ = threads // AI-470 converge: left rail is roster, not thread list.

@@ -91,13 +91,16 @@ func (s *Service) HandleThoughtsArtifactSearch(c echo.Context) error {
 		}
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid artifact directory")
 	}
-	if threadID == "" && thoughtsChatHref("", selectedDoc) == "" {
+	if threadID == "" && thoughtsBotHomeHref(selectedDoc) == "" &&
+		thoughtsChatHref("", selectedDoc) == "" {
 		browser = remapThreadArtifactBrowserForThoughts(browser, selectedDoc)
 	}
+	showAll := artifactSearchRelPrefix(browser.DirectoryPath) != "" &&
+		thoughtsBotHomeRootRel(selectedDoc) == ""
 	results := ThreadArtifactBrowserResultsArgs{
 		Query:           query,
 		Entries:         browser.Entries,
-		ShowAllThoughts: artifactSearchRelPrefix(browser.DirectoryPath) != "",
+		ShowAllThoughts: showAll,
 		ParentHref:      browser.ParentHref,
 	}
 	if query != "" {
@@ -135,6 +138,9 @@ func (s *Service) artifactSearchSections(
 	if cwdDir == "" {
 		return directory, nil
 	}
+	if thoughtsBotHomeRootRel(selectedDoc) != "" {
+		return directory, nil
+	}
 	global = s.searchThoughtsNames(query, selectedDoc, threadID, "", cwdDir)
 	return directory, global
 }
@@ -144,6 +150,12 @@ func (s *Service) searchThoughtsNames(
 ) []ArtifactSearchHit {
 	if s == nil || strings.TrimSpace(s.basePath) == "" {
 		return nil
+	}
+	if root := thoughtsBotHomeRootRel(selectedDoc); root != "" {
+		startRel = botHomeClampedDirectory(selectedDoc, startRel)
+		if startRel == "" {
+			startRel = root
+		}
 	}
 	start := s.basePath
 	if startRel != "" {
@@ -223,6 +235,9 @@ func (s *Service) searchThoughtsNames(
 func artifactSearchFileHref(threadID, docPath string) string {
 	if strings.TrimSpace(threadID) != "" {
 		return ThreadArtifactHref(threadID, docPath)
+	}
+	if href := thoughtsBotHomeHref(docPath); href != "" {
+		return href
 	}
 	if href := thoughtsChatHref("", docPath); href != "" {
 		return href

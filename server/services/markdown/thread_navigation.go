@@ -188,6 +188,9 @@ func scopedBrowseArtifactHref(threadID, docPath, directoryPath string) string {
 	if strings.TrimSpace(threadID) != "" {
 		return ThreadArtifactHrefAtDirectory(threadID, docPath, directoryPath)
 	}
+	if href := thoughtsBotHomeHref(docPath); href != "" {
+		return withArtifactDirQuery(href, directoryPath)
+	}
 	if href := thoughtsChatHref("", docPath); href != "" {
 		return withArtifactDirQuery(href, directoryPath)
 	}
@@ -559,6 +562,7 @@ func (s *Service) threadArtifactBrowser(
 	if err != nil {
 		return ThreadArtifactBrowserArgs{}, err
 	}
+	directoryPath = botHomeClampedDirectory(docPath, directoryPath)
 	listing, err := s.GetDirectoryListing(directoryPath)
 	if err != nil {
 		return ThreadArtifactBrowserArgs{}, err
@@ -877,6 +881,7 @@ func (s *Service) thoughtsDirectoryArtifactBrowser(
 	if err != nil {
 		return ThreadArtifactBrowserArgs{}, err
 	}
+	canonical = botHomeClampedDirectory(canonical, canonical)
 	listing, err := s.GetDirectoryListing(canonical)
 	if err != nil {
 		return ThreadArtifactBrowserArgs{}, err

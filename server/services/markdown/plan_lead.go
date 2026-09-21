@@ -128,6 +128,112 @@ func rosterPlanTime(t time.Time) string {
 	return t.Local().Format("Mon 3:04 PM")
 }
 
+func thoughtsCanonicalRel(docPath string) string {
+	canonical, err := CanonicalThoughtsDocPath(docPath)
+	if err != nil {
+		canonical, err = CanonicalThoughtsDirPath(docPath)
+		if err != nil {
+			return ""
+		}
+	}
+	return strings.Trim(filepath.ToSlash(canonical), "/")
+}
+
+func thoughtsBotHomeSlug(docPath string) string {
+	rel := thoughtsCanonicalRel(docPath)
+	parts := strings.Split(rel, "/")
+	if len(parts) < 2 || parts[0] != "agents" {
+		return ""
+	}
+	slug := strings.TrimSpace(parts[1])
+	if slug == "" || slug == "." {
+		return ""
+	}
+	return slug
+}
+
+func thoughtsBotHomeRoot(docPath string) string {
+	slug := thoughtsBotHomeSlug(docPath)
+	if slug == "" {
+		return ""
+	}
+	return "thoughts/agents/" + slug
+}
+
+func thoughtsBotHomeRootRel(docPath string) string {
+	slug := thoughtsBotHomeSlug(docPath)
+	if slug == "" {
+		return ""
+	}
+	return "agents/" + slug
+}
+
+func thoughtsBotHomeHref(docPath string) string {
+	slug := thoughtsBotHomeSlug(docPath)
+	if slug == "" {
+		return ""
+	}
+	href := "/rooms/dm/" + url.PathEscape(slug)
+	canonical, err := CanonicalThoughtsDocPath(docPath)
+	if err != nil {
+		canonical, err = CanonicalThoughtsDirPath(docPath)
+		if err != nil {
+			return href
+		}
+	}
+	if canonical == "" {
+		return href
+	}
+	return href + "?artifact=" + url.QueryEscape("thoughts/"+canonical)
+}
+
+var thoughtsBotHomeArtifactNames = []string{
+	"AGENTS.md",
+	"MEMORY.md",
+	"USER.md",
+}
+
+func (s *Service) thoughtsBotHomeArtifactPath(slug string) string {
+	slug = strings.TrimSpace(slug)
+	if slug == "" {
+		return ""
+	}
+	first := "thoughts/agents/" + slug + "/" + thoughtsBotHomeArtifactNames[0]
+	for _, name := range thoughtsBotHomeArtifactNames {
+		path := "thoughts/agents/" + slug + "/" + name
+		if s.planDocExists(path) {
+			return path
+		}
+	}
+	return first
+}
+
+func botHomeClampedDirectory(docPath, directoryPath string) string {
+	root := thoughtsBotHomeRootRel(docPath)
+	if root == "" {
+		return directoryPath
+	}
+	dir := strings.Trim(filepath.ToSlash(directoryPath), "/")
+	dir = strings.TrimPrefix(dir, "thoughts/")
+	if dir == root || strings.HasPrefix(dir, root+"/") {
+		return directoryPath
+	}
+	return root
+}
+
+func botHomeParentOutside(docPath, parent string) bool {
+	root := thoughtsBotHomeRootRel(docPath)
+	if root == "" {
+		return false
+	}
+	p := strings.Trim(filepath.ToSlash(parent), "/")
+	p = strings.TrimPrefix(p, "thoughts/")
+	if p == "" || p == "." {
+		return true
+	}
+	return p != root && !strings.HasPrefix(p, root+"/")
+}
+
 func thoughtsPlanDocPath(planDirRel, name string) string {
 	rel := filepath.ToSlash(strings.TrimSpace(planDirRel))
 	rel = strings.Trim(rel, "/")

@@ -132,6 +132,14 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 			}
 		}
 	}
+	if kind == agenthome.KindDM && !hasArtifact {
+		if doc := s.thoughtsBotHomeArtifactPath(id); doc != "" {
+			artifactPath, hasArtifact, err = optionalThreadArtifact(doc)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+			}
+		}
+	}
 	planDoc := artifactPath
 	if planDoc != "" && !strings.HasPrefix(planDoc, "thoughts/") {
 		planDoc = "thoughts/" + planDoc
@@ -238,12 +246,6 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 			)
 			chatOpen = true
 		}
-	}
-
-	// Bot details default to on-disk memory files; explicit ?artifact= wins.
-	if kind == agenthome.KindDM && !hasArtifact {
-		artifactComp = s.agentProfilePane(kind, id, c.QueryParam("file"))
-		_ = mobileActiveRegionForRoom("profile")
 	}
 
 	chatOpen, commentsOpen := chatCommentsOpen(c.Request(), chatOpen)

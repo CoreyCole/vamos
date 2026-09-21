@@ -308,7 +308,10 @@ func TestServeAI470RoomProfileViewListsDiskFiles(t *testing.T) {
 	}
 	body := rec.Body.String()
 	for _, want := range []string{
-		"AGENTS.md", "MEMORY.md", `id="agent-profile-pane"`, `id="agent-profile-files"`,
+		"AGENTS.md", "MEMORY.md",
+		`id="thread-artifact-pane"`,
+		`id="thread-artifact-document"`,
+		`data-testid="artifact-browser-toggle"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("missing %q: %s", want, body)
@@ -317,8 +320,13 @@ func TestServeAI470RoomProfileViewListsDiskFiles(t *testing.T) {
 	if strings.Contains(body, "USER.md") {
 		t.Fatalf("invented missing USER.md: %s", body)
 	}
-	if strings.Contains(body, `id="thread-artifact-document"`) {
-		t.Fatalf("bot default used ThreadArtifactPane: %s", body)
+	for _, forbidden := range []string{
+		`id="agent-profile-pane"`,
+		`id="agent-profile-body"`,
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("unexpected %q: %s", forbidden, body)
+		}
 	}
 }
 
@@ -400,8 +408,11 @@ func TestServeThreadBotScopedShowsMemoryPane(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, `id="agent-profile-pane"`) {
-		t.Fatalf("missing memory pane: %s", body)
+	if !strings.Contains(body, `id="thread-artifact-document"`) {
+		t.Fatalf("missing ThreadArtifactPane: %s", body)
+	}
+	if strings.Contains(body, `id="agent-profile-pane"`) {
+		t.Fatalf("bot click-in used ProfilePane: %s", body)
 	}
 	if strings.Contains(body, "Select a thread to view an artifact.") {
 		t.Fatalf("placeholder artifact: %s", body)
@@ -451,8 +462,11 @@ func TestServeThreadBotMemoryHonorsArtifactCookieClosed(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, `id="agent-profile-pane"`) {
+	if !strings.Contains(body, `id="thread-artifact-document"`) {
 		t.Fatalf("memory pane still mounts: %s", body)
+	}
+	if strings.Contains(body, `id="agent-profile-pane"`) {
+		t.Fatalf("bot click-in used ProfilePane: %s", body)
 	}
 	if !strings.Contains(body, `md:!hidden`) {
 		t.Fatalf("cookie=0 must close details column: %s", body)

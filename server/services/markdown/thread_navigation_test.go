@@ -14,6 +14,52 @@ import (
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 )
 
+func TestScopedBrowseArtifactHrefUsesDMRoomForBotHome(t *testing.T) {
+	t.Parallel()
+
+	doc := "thoughts/agents/nova/MEMORY.md"
+	dir := "thoughts/agents/nova"
+	got := scopedBrowseArtifactHref("", doc, dir)
+	wantPrefix := "/rooms/dm/nova?artifact="
+	if !strings.HasPrefix(got, wantPrefix) {
+		t.Fatalf("href = %q, want prefix %q", got, wantPrefix)
+	}
+	if strings.Contains(got, "/threads?") {
+		t.Fatalf("empty threadID bounced to /threads: %q", got)
+	}
+	if strings.Contains(got, "/rooms/plan/agents--nova") {
+		t.Fatalf("bot home used plan room: %q", got)
+	}
+	if got := scopedBrowseArtifactHref(
+		"thread_1",
+		doc,
+		dir,
+	); !strings.HasPrefix(
+		got,
+		"/threads/thread_1?",
+	) {
+		t.Fatalf("click-in href = %q", got)
+	}
+}
+
+func TestBotHomeParentHrefStaysInsideHome(t *testing.T) {
+	t.Parallel()
+
+	doc := "thoughts/agents/nova/MEMORY.md"
+	if !botHomeParentOutside(doc, "thoughts/agents") {
+		t.Fatalf("parent at thoughts/agents must be outside bot home")
+	}
+	if botHomeParentOutside(doc, "thoughts/agents/nova") {
+		t.Fatalf("bot home itself is not outside")
+	}
+	if botHomeParentOutside(doc, "thoughts/agents/nova/skills") {
+		t.Fatalf("skills stays under bot home")
+	}
+	if got := botHomeClampedDirectory(doc, "thoughts/agents"); got != "agents/nova" {
+		t.Fatalf("clamp listing = %q", got)
+	}
+}
+
 func TestScopedBrowseArtifactHrefUsesPlanRoomWhenThreadEmpty(t *testing.T) {
 	t.Parallel()
 
