@@ -35,9 +35,45 @@ func TestEmptyScopeComposerUsesAgentChatComposer(t *testing.T) {
 			t.Fatalf("empty-scope composer missing %q: %s", want, html)
 		}
 	}
-	for _, unwanted := range []string{`aria-label="Add"`, `title="Add"`} {
+	for _, unwanted := range []string{`aria-label="Add"`, `title="Add"`, "Freeform chat"} {
 		if strings.Contains(html, unwanted) {
 			t.Fatalf("empty-scope composer still has %q: %s", unwanted, html)
+		}
+	}
+	if !strings.Contains(html, ">plan<") {
+		t.Fatalf("plan N=0 Mode must be plan: %s", html)
+	}
+}
+
+func TestEmptyScopeModeLabel(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		action, doc, want string
+	}{
+		{
+			"@post('/rooms/plan/real-plan/threads', {contentType: 'form'})",
+			"thoughts/creative-mode-agent/plans/real-plan/AGENTS.md",
+			"plan",
+		},
+		{
+			"@post('/rooms/plan/docs--vamos/threads', {contentType: 'form'})",
+			"thoughts/docs/vamos/index.html",
+			"docs",
+		},
+		{
+			"@post('/rooms/dm/research/threads', {contentType: 'form'})",
+			"",
+			"agent",
+		},
+		{
+			"@post('/rooms/freeform/threads', {contentType: 'form'})",
+			"",
+			"freeform",
+		},
+	}
+	for _, tc := range cases {
+		if got := emptyScopeModeLabel(tc.action, tc.doc); got != tc.want {
+			t.Fatalf("mode(%q, %q) = %q, want %q", tc.action, tc.doc, got, tc.want)
 		}
 	}
 }

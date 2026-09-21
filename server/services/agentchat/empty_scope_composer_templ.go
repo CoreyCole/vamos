@@ -8,7 +8,7 @@ package agentchat
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func emptyScopeAgentChatComposer(action string, attached []AttachedPath, extra []ComposerHiddenField) templ.Component {
+func emptyScopeAgentChatComposer(action, modeLabel string, attached []AttachedPath, extra []ComposerHiddenField) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -36,6 +36,7 @@ func emptyScopeAgentChatComposer(action string, attached []AttachedPath, extra [
 		templ_7745c5c3_Err = AgentChatComposer(AgentChatComposerArgs{
 			Action:               action,
 			FormID:               "agent-chat-composer",
+			ModeLabel:            modeLabel,
 			Placeholder:          "Start a new thread",
 			HideSlash:            true,
 			HideNewThreadTargets: true,
