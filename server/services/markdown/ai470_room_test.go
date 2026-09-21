@@ -68,6 +68,7 @@ func TestServeAI470RoomUsesArtifactPathForPlanChat(t *testing.T) {
 		"Real plan",
 		"design.md",
 		"AGENTS.md",
+		`name="attached_paths[]"`,
 		`/rooms/plan/real-plan?artifact=thoughts%2Fcreative-mode-agent%2Fplans%2Freal-plan%2FAGENTS.md`,
 	} {
 		if !strings.Contains(body, want) {

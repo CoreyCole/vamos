@@ -1,0 +1,17 @@
+package agentchat
+
+templ emptyScopeAgentChatComposer(action string, attached []AttachedPath, extra []ComposerHiddenField) {
+	<div class="flex h-full min-h-0 flex-col bg-background">
+		<div class="mt-auto shrink-0 px-3 py-3">
+			@AgentChatComposer(AgentChatComposerArgs{
+				Action:               action,
+				FormID:               "agent-chat-composer",
+				Placeholder:          "Start a new thread",
+				HideSlash:            true,
+				HideNewThreadTargets: true,
+				AttachedPaths:        attached,
+				ExtraHidden:          extra,
+			})
+		</div>
+	</div>
+}
