@@ -550,6 +550,12 @@ func TestServeAI470RoomBotZeroThreadsComposerDoesNotInsert(t *testing.T) {
 	if strings.Contains(body, `id="thread-chat"`) {
 		t.Fatal("N=0 must not render SharedThreadChat")
 	}
+	if strings.Contains(body, "Freeform chat") {
+		t.Fatal("bot N=0 Mode must not be Freeform chat")
+	}
+	if !strings.Contains(body, ">agent<") {
+		t.Fatalf("bot N=0 Mode must be agent: %s", body)
+	}
 }
 
 func TestServeAI470RoomBotTwoThreadsListsBoth(t *testing.T) {
@@ -1228,6 +1234,12 @@ func TestServeAI470RoomPlanZeroThreadsDoesNotInsert(t *testing.T) {
 	}
 	if strings.Contains(body, "/thoughts/chat/freeform/send") {
 		t.Fatal("N=0 composer must not wire freeform send")
+	}
+	if strings.Contains(body, "Freeform chat") {
+		t.Fatal("plan N=0 Mode must not be Freeform chat")
+	}
+	if !strings.Contains(body, ">plan<") {
+		t.Fatalf("plan N=0 Mode must be plan: %s", body)
 	}
 }
 

@@ -12,13 +12,13 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	SetEmptyScopeComposer(func(action, attachedDoc string) templ.Component {
-		return testEmptyScopeComposer(action, attachedDoc)
+	SetEmptyScopeComposer(func(action, attachedDoc, modeLabel string) templ.Component {
+		return testEmptyScopeComposer(action, attachedDoc, modeLabel)
 	})
 	os.Exit(m.Run())
 }
 
-func testEmptyScopeComposer(action, attachedDoc string) templ.Component {
+func testEmptyScopeComposer(action, attachedDoc, modeLabel string) templ.Component {
 	base := filepath.Base(strings.Trim(attachedDoc, "/"))
 	path := strings.TrimSpace(attachedDoc)
 	if path != "" && !strings.HasPrefix(path, "thoughts/") {
@@ -38,6 +38,9 @@ func testEmptyScopeComposer(action, attachedDoc string) templ.Component {
 			b.WriteString(base)
 			b.WriteString(`</span>`)
 		}
+		b.WriteString(`<dt>Mode</dt><dd>`)
+		b.WriteString(modeLabel)
+		b.WriteString(`</dd>`)
 		b.WriteString(
 			`<textarea id="agent-chat-composer-input" name="prompt"></textarea>`,
 		)

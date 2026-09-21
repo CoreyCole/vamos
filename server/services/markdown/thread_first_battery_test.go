@@ -105,6 +105,12 @@ func TestServeAI470RoomDocsZeroThreadsDoesNotInsert(t *testing.T) {
 	if strings.Contains(body, `id="thread-chat"`) {
 		t.Fatal("N=0 must not render SharedThreadChat")
 	}
+	if strings.Contains(body, "Freeform chat") {
+		t.Fatal("docs desk N=0 Mode must not be Freeform chat")
+	}
+	if !strings.Contains(body, ">docs<") {
+		t.Fatalf("docs desk N=0 Mode must be docs: %s", body)
+	}
 }
 
 func TestHandleCreateAgentListLandHasRosterDMHref(t *testing.T) {

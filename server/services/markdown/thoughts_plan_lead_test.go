@@ -141,6 +141,12 @@ func TestThoughtsDocSSRWiresSharedChatNotEmptyRegion(t *testing.T) {
 	if strings.Contains(html, `id="thread-chat"`) {
 		t.Fatal("thoughts GET must not auto click-in")
 	}
+	if strings.Contains(html, "Freeform chat") {
+		t.Fatal("thoughts/docs/vamos Mode must not be Freeform chat")
+	}
+	if !strings.Contains(html, ">docs<") {
+		t.Fatalf("thoughts/docs/vamos Mode must be docs: %s", html)
+	}
 	if renderer.lastEnsureDoc != "" {
 		t.Fatalf("GET must not ensure, doc = %q", renderer.lastEnsureDoc)
 	}

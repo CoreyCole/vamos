@@ -120,6 +120,7 @@ func (s *Service) renderSharedThreadChat(
 		// derived from plan_dir_rel (BE contract). Pairwise remains view-only.
 		ComposerDisabled: fixtureMode == "pairwise" ||
 			thread.RoomKind == RoomKindPairwise,
+		ModeLabel: scopedThreadModeLabel(thread),
 	}
 	if family, ferr := s.BuildChatThreadFamily(ctx, thread.ID); ferr == nil {
 		args.ThreadFamily = family

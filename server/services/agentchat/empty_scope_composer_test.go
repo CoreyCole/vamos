@@ -13,6 +13,7 @@ func TestEmptyScopeComposerUsesAgentChatComposer(t *testing.T) {
 	if err := EmptyScopeComposer(
 		"@post('/rooms/plan/real-plan/threads', {contentType: 'form'})",
 		"thoughts/creative-mode-agent/plans/real-plan/AGENTS.md",
+		"plan",
 	).Render(context.Background(), &buf); err != nil {
 		t.Fatal(err)
 	}
@@ -42,6 +43,45 @@ func TestEmptyScopeComposerUsesAgentChatComposer(t *testing.T) {
 	}
 	if !strings.Contains(html, ">plan<") {
 		t.Fatalf("plan N=0 Mode must be plan: %s", html)
+	}
+}
+
+
+func TestEmptyScopeComposerDocsDeskModeIsDocs(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	if err := EmptyScopeComposer(
+		"@post('/rooms/plan/docs--vamos/threads', {contentType: 'form'})",
+		"thoughts/docs/vamos/index.html",
+		"docs",
+	).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	if strings.Contains(html, "Freeform chat") {
+		t.Fatalf("docs desk Mode must not be Freeform chat: %s", html)
+	}
+	if !strings.Contains(html, ">docs<") {
+		t.Fatalf("docs desk Mode must be docs: %s", html)
+	}
+}
+
+func TestEmptyScopeComposerAgentModeIsAgent(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	if err := EmptyScopeComposer(
+		"@post('/rooms/dm/research/threads', {contentType: 'form'})",
+		"",
+		"agent",
+	).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	if strings.Contains(html, "Freeform chat") {
+		t.Fatalf("bot DM Mode must not be Freeform chat: %s", html)
+	}
+	if !strings.Contains(html, ">agent<") {
+		t.Fatalf("bot DM Mode must be agent: %s", html)
 	}
 }
 

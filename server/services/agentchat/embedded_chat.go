@@ -75,6 +75,7 @@ type EmbeddedFreeformPanelArgs struct {
 	ComposerAction   string
 	Cwd              string
 	Placeholder      string
+	ModeLabel        string
 	ThreadMetadata   ThreadMetadataView
 	InitialDraft     string
 	DraftSaveAction  string
@@ -528,6 +529,35 @@ func embeddedFreeformModeLabel(metadata ThreadMetadataView) string {
 		return "Workspace-backed thread"
 	}
 	return "Freeform chat"
+}
+
+func sharedThreadModeLabel(args EmbeddedFreeformPanelArgs) string {
+	if strings.TrimSpace(args.ModeLabel) != "" {
+		return args.ModeLabel
+	}
+	return embeddedFreeformModeLabel(args.ThreadMetadata)
+}
+
+func scopedThreadModeLabel(thread db.AgentThread) string {
+	kind := strings.TrimSpace(thread.RoomKind)
+	rel := ""
+	if thread.PlanDirRel.Valid {
+		rel = thread.PlanDirRel.String
+	}
+	switch kind {
+	case RoomKindBotHome:
+		return "agent"
+	case RoomKindPlan:
+		if emptyScopeIsDocsDesk("", rel) {
+			return "docs"
+		}
+		return "plan"
+	default:
+		if strings.EqualFold(kind, "freeform") {
+			return "freeform"
+		}
+		return embeddedFreeformModeLabel(ThreadMetadataView{})
+	}
 }
 
 func embeddedWorkspaceModeLabel(metadata ThreadMetadataView) string {

@@ -18,20 +18,23 @@ import (
 
 // emptyScopeComposer is set by agentchat (init) so N=0 lands use AgentChatComposer
 // without an import cycle.
-var emptyScopeComposer func(action, attachedDoc string) templ.Component
+var emptyScopeComposer func(action, attachedDoc, modeLabel string) templ.Component
 
-func SetEmptyScopeComposer(fn func(action, attachedDoc string) templ.Component) {
+func SetEmptyScopeComposer(fn func(action, attachedDoc, modeLabel string) templ.Component) {
 	emptyScopeComposer = fn
 }
 
 func renderScopedThreadListOrComposer(
 	rows []agenthome.ConversationRowArgs,
-	composerAction string,
-	attachedDoc string,
+	kind, id, attachedDoc string,
 ) templ.Component {
 	if len(rows) == 0 {
 		if emptyScopeComposer != nil {
-			return emptyScopeComposer(composerAction, attachedDoc)
+			return emptyScopeComposer(
+				emptyScopeComposerAction(kind, id),
+				attachedDoc,
+				emptyScopeModeLabel(kind, id, attachedDoc),
+			)
 		}
 		return templ.NopComponent
 	}

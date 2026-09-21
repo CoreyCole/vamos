@@ -80,7 +80,8 @@ func (s *Service) thoughtsWorkbenchChatColumn(
 		}
 		body = renderScopedThreadListOrComposer(
 			rows,
-			emptyScopeComposerAction("plan", roomID),
+			"plan",
+			roomID,
 			artifact,
 		)
 	}

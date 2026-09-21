@@ -13,14 +13,17 @@ func init() {
 	markdown.SetEmptyScopeComposer(EmptyScopeComposer)
 }
 
-func EmptyScopeComposer(action, attachedDoc string) templ.Component {
+func EmptyScopeComposer(action, attachedDoc, modeLabel string) templ.Component {
 	var extra []ComposerHiddenField
 	if doc := strings.TrimSpace(attachedDoc); doc != "" {
 		extra = append(extra, ComposerHiddenField{Name: "artifact", Value: doc})
 	}
+	if strings.TrimSpace(modeLabel) == "" {
+		modeLabel = emptyScopeModeLabel(action, attachedDoc)
+	}
 	return emptyScopeAgentChatComposer(
 		action,
-		emptyScopeModeLabel(action, attachedDoc),
+		modeLabel,
 		attachFromDoc(attachedDoc),
 		extra,
 	)

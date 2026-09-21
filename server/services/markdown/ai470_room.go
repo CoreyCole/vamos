@@ -60,7 +60,8 @@ func (s *Service) ServeFreeformRoom(c echo.Context) error {
 		roomTitle,
 		renderScopedThreadListOrComposer(
 			rows,
-			emptyScopeComposerAction("freeform", ""),
+			"freeform",
+			"",
 			artifactPath,
 		),
 		BuildChatHeaderOverflow(artifactPage, artifactDoc, true),
@@ -187,7 +188,8 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 			roomTitle,
 			renderScopedThreadListOrComposer(
 				rows,
-				emptyScopeComposerAction(scopeKind, id),
+				scopeKind,
+				id,
 				artifactPath,
 			),
 			BuildChatHeaderOverflow(artifactPage, artifactDoc, includePlanChat),

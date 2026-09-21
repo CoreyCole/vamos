@@ -249,6 +249,32 @@ func emptyScopeComposerAction(kind, id string) string {
 	}
 }
 
+func emptyScopeModeLabel(kind, id, attachedDoc string) string {
+	switch kind {
+	case "dm":
+		return "agent"
+	case "freeform":
+		return "freeform"
+	case "plan":
+		if emptyScopeIsDocsDesk(id, attachedDoc) {
+			return "docs"
+		}
+		return "plan"
+	default:
+		return "freeform"
+	}
+}
+
+func emptyScopeIsDocsDesk(id, attachedDoc string) bool {
+	id = strings.ToLower(strings.TrimSpace(id))
+	if strings.HasPrefix(id, "docs--") {
+		return true
+	}
+	doc := strings.ToLower(filepath.ToSlash(strings.TrimSpace(attachedDoc)))
+	doc = strings.TrimPrefix(doc, "thoughts/")
+	return strings.HasPrefix(doc, "docs/") || strings.Contains(doc, "/docs/")
+}
+
 func writeEmptyScopePiHeader(absPath, sessionID, cwd string) error {
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" {
