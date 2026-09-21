@@ -590,8 +590,13 @@ func (s *Service) threadArtifactBrowser(
 	}
 	if directoryPath != "" && docPath != "" {
 		parent := path.Dir(directoryPath)
-		args.ParentHref = scopedBrowseArtifactHref(threadID, docPath, parent)
-		args.ParentEndpoint = ThreadArtifactBrowserEndpoint(threadID, docPath, parent)
+		if botHomeParentOutside(docPath, parent) {
+			args.ParentHref = ""
+			args.ParentEndpoint = ""
+		} else {
+			args.ParentHref = scopedBrowseArtifactHref(threadID, docPath, parent)
+			args.ParentEndpoint = ThreadArtifactBrowserEndpoint(threadID, docPath, parent)
+		}
 	}
 	return args, nil
 }
@@ -791,11 +796,16 @@ func remapThreadArtifactBrowserForThoughts(
 		if parent == "." {
 			parent = ""
 		}
-		browser.ParentHref = thoughtsArtifactPageURL(selectedDoc, parent)
-		browser.ParentEndpoint = thoughtsArtifactBrowserEndpoint(
-			selectedDoc,
-			parent,
-		)
+		if botHomeParentOutside(selectedDoc, parent) {
+			browser.ParentHref = ""
+			browser.ParentEndpoint = ""
+		} else {
+			browser.ParentHref = thoughtsArtifactPageURL(selectedDoc, parent)
+			browser.ParentEndpoint = thoughtsArtifactBrowserEndpoint(
+				selectedDoc,
+				parent,
+			)
+		}
 	} else {
 		browser.ParentHref = ""
 		browser.ParentEndpoint = ""
@@ -907,8 +917,13 @@ func (s *Service) thoughtsDirectoryArtifactBrowser(
 		if parent == "." {
 			parent = ""
 		}
-		args.ParentHref = scopedBrowseArtifactHref("", canonical, parent)
-		args.ParentEndpoint = ThreadArtifactBrowserEndpoint("", canonical, parent)
+		if botHomeParentOutside(canonical, parent) {
+			args.ParentHref = ""
+			args.ParentEndpoint = ""
+		} else {
+			args.ParentHref = scopedBrowseArtifactHref("", canonical, parent)
+			args.ParentEndpoint = ThreadArtifactBrowserEndpoint("", canonical, parent)
+		}
 	}
 	return args, nil
 }
