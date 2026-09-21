@@ -149,14 +149,7 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 	commentsComp := WorkbenchUnavailable("Select an artifact to view comments.")
 	chatOpen := false
 	includePlanChat := kind != agenthome.KindPlan
-	// View Chat from thoughts must leave the artifact open even if the user
-	// previously hid details (wb2_artifact_open=0). Close details still works
-	// after landing; this only forces open on plan+artifact entry.
-	forceArtifactOpen := kind == agenthome.KindPlan && hasArtifact
 	artifactChromeOpen := workbench.ArtifactOpenFromRequest(c.Request())
-	if forceArtifactOpen {
-		artifactChromeOpen = true
-	}
 
 	if kind == agenthome.KindDM || kind == agenthome.KindPlan {
 		var rows []agenthome.ConversationRowArgs
@@ -257,10 +250,6 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 	if viewport.IsDesktop() {
 		// Class B cookie↔SSR (Threads-reopen pattern); default open when missing.
 		artifactOpen = artifactChromeOpen
-	}
-	if forceArtifactOpen {
-		artifactOpen = true
-		workbench.WriteArtifactOpenCookie(c.Response(), true)
 	}
 	state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     userEmail,

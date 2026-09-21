@@ -122,12 +122,40 @@ func TestChatColumnArtifactReopenWhenClosed(t *testing.T) {
 		t.Fatalf("missing artifact reopen slot: %s", out)
 	}
 	if !strings.Contains(out, `class="sr-only"`) ||
-		!strings.Contains(out, "Open details") {
-		t.Fatalf("want icon-only Open details with sr-only: %s", out)
+		!strings.Contains(out, "Details") {
+		t.Fatalf("want icon-only details toggle with sr-only: %s", out)
 	}
-	if strings.Contains(out, `>Open details</span>`) &&
-		!strings.Contains(out, `sr-only">Open details`) {
-		t.Fatalf("Open details must not be visible label: %s", out)
+}
+
+func TestChatColumnArtifactToggleVisibleWhenOpen(t *testing.T) {
+	var buf bytes.Buffer
+	if err := ChatColumnWithReopen(
+		true,
+		true,
+		"Bot",
+		templ.Raw("<p>chat</p>"),
+		nil,
+	).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	idx := strings.Index(out, `id="workbench-v2-artifact-reopen"`)
+	if idx < 0 {
+		t.Fatalf("missing artifact toggle slot: %s", out)
+	}
+	end := strings.Index(out[idx:], ">")
+	openTag := out[idx : idx+end]
+	classIdx := strings.Index(openTag, `class="`)
+	classEnd := strings.Index(openTag[classIdx+7:], `"`)
+	classVal := openTag[classIdx+7 : classIdx+7+classEnd]
+	if strings.Contains(classVal, "hidden") {
+		t.Fatalf("open artifact must keep details toggle visible: %s", classVal)
+	}
+	if !strings.Contains(out, `data-testid="artifact-open-details"`) {
+		t.Fatalf("missing artifact-open-details: %s", out)
+	}
+	if !strings.Contains(out, `aria-pressed="true"`) {
+		t.Fatalf("open details toggle must be pressed: %s", out)
 	}
 }
 

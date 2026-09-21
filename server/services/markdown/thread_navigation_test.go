@@ -731,7 +731,25 @@ func TestPathHeaderShowsCloseDetailsWhenShowCloseDetails(t *testing.T) {
 	}
 	header := artifactPathHeader(t, body.String())
 	if !strings.Contains(header, `data-testid="artifact-close-details"`) {
-		t.Fatalf("threads path-header missing Close details:\n%s", header)
+		t.Fatalf("opt-in path-header missing Close details:\n%s", header)
+	}
+}
+
+func TestPathHeaderThreadsOmitCloseDetails(t *testing.T) {
+	var body strings.Builder
+	if err := ThreadArtifactPane(
+		ThreadArtifactBrowserArgs{
+			ThreadID:         "thread-1",
+			DocPath:          "owner/plans/alpha/design.md",
+			ShowCloseDetails: false,
+		},
+		templ.Raw("<p>doc</p>"),
+	).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	header := artifactPathHeader(t, body.String())
+	if strings.Contains(header, `data-testid="artifact-close-details"`) {
+		t.Fatalf("V2 threads path-header must not paint Close details:\n%s", header)
 	}
 }
 

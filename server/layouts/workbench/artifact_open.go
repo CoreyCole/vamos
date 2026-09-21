@@ -53,13 +53,11 @@ func artifactOpenCookieWriteJS(open bool) string {
 }
 
 // ArtifactHideClickAction collapses the artifact pane and persists via cookie.
-// Apply DOM visibility immediately (comments-toggle pattern) so chat flex
-// expands without waiting for a hard refresh / Datastar class catch-up.
+// Signal + cookie + layout-reflow only — do not call workbenchApplyRegionVisible
+// or workbenchReflow here; those grow chat and slide the details toggle.
 func ArtifactHideClickAction() string {
 	return "$workbench.regions.workbenchV2Artifact.visible = false; " +
 		artifactOpenCookieWriteJS(false) + "; " +
-		"if (window.workbenchApplyRegionVisible) { workbenchApplyRegionVisible('workbench-v2-artifact', false) }; " +
-		"if (window.workbenchReflow) { workbenchReflow() }; " +
 		threadsLayoutReflowJS()
 }
 
@@ -67,9 +65,16 @@ func ArtifactHideClickAction() string {
 func ArtifactShowClickAction() string {
 	return "$workbench.regions.workbenchV2Artifact.visible = true; " +
 		artifactOpenCookieWriteJS(true) + "; " +
-		"if (window.workbenchApplyRegionVisible) { workbenchApplyRegionVisible('workbench-v2-artifact', true) }; " +
-		"if (window.workbenchReflow) { workbenchReflow() }; " +
 		threadsLayoutReflowJS()
+}
+
+// ArtifactToggleClickAction opens or closes details and persists the cookie.
+func ArtifactToggleClickAction() string {
+	return "if ($workbench.regions.workbenchV2Artifact.visible === false) { " +
+		ArtifactShowClickAction() +
+		" } else { " +
+		ArtifactHideClickAction() +
+		" }"
 }
 
 func ArtifactHideControlTitle() string {
@@ -80,14 +85,6 @@ func ArtifactShowControlTitle() string {
 	return "Open details"
 }
 
-// ArtifactReopenDataClass hides the reopen control unless artifact is explicitly closed.
-func ArtifactReopenDataClass() string {
-	return "{'hidden': $workbench.regions.workbenchV2Artifact.visible !== false}"
-}
-
-func artifactOpenAriaHidden(open bool) string {
-	if open {
-		return "true"
-	}
-	return "false"
+func ArtifactToggleControlTitle() string {
+	return "Details"
 }

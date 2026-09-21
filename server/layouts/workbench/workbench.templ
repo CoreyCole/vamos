@@ -62,26 +62,31 @@ templ ThreadsReopenControl(threadsOpen bool, controlID string) {
 	</div>
 }
 
-// ArtifactReopenControl — desktop reopen when artifact pane is closed (Grok-like Open details).
-// Lives in chat header; path-header Close details is md:flex only (no second mobile >>).
+// ArtifactReopenControl — always-visible details toggle in the chat header (hamburger twin).
+// Do not hide this slot when the pane is open; pressed/aria-pressed tracks visibility.
 templ ArtifactReopenControl(artifactOpen bool, controlID string) {
 	<div
 		id={ controlID }
-		class={ "workbench-chrome flex h-7 shrink-0 items-center justify-center", templ.KV("hidden", artifactOpen) }
-		data-class={ ArtifactReopenDataClass() }
-		aria-hidden={ artifactOpenAriaHidden(artifactOpen) }
+		class="workbench-chrome flex h-7 w-7 shrink-0 items-center justify-center"
 	>
 		<button
 			type="button"
 			data-testid="artifact-open-details"
-			class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			data-on:click={ ArtifactShowClickAction() }
+			class={ "inline-flex h-7 w-7 items-center justify-center rounded-md border border-border text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", templ.KV("bg-muted text-foreground", artifactOpen) }
+			data-on:click={ ArtifactToggleClickAction() }
+			data-attr:aria-pressed="$workbench.regions.workbenchV2Artifact.visible ? 'true' : 'false'"
+			data-class="{ 'bg-muted text-foreground': $workbench.regions.workbenchV2Artifact.visible }"
 			aria-controls="workbench-v2-artifact"
-			aria-label={ ArtifactShowControlTitle() }
-			title={ ArtifactShowControlTitle() }
+			aria-label={ ArtifactToggleControlTitle() }
+			title={ ArtifactToggleControlTitle() }
+			if artifactOpen {
+				aria-pressed="true"
+			} else {
+				aria-pressed="false"
+			}
 		>
 			<span aria-hidden="true" class="font-mono text-[11px] leading-none">&lt;&lt;</span>
-			<span class="sr-only">Open details</span>
+			<span class="sr-only">Details</span>
 		</button>
 	</div>
 }

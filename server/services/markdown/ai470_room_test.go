@@ -762,7 +762,7 @@ func TestAI470RoomTitleUsesLiveAgentName(t *testing.T) {
 	}
 }
 
-func TestServeAI470RoomForcesArtifactOpenOnPlanViewChat(t *testing.T) {
+func TestServeAI470RoomHonorsArtifactClosedCookieOnPlanViewChat(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
@@ -809,9 +809,9 @@ func TestServeAI470RoomForcesArtifactOpenOnPlanViewChat(t *testing.T) {
 		end = len(body)
 	}
 	window := body[idx:end]
-	if !strings.Contains(window, `visible&#34;:true`) &&
-		!strings.Contains(window, `"visible":true`) {
-		t.Fatalf("plan View Chat must keep artifact open despite cookie=0: %s", window)
+	if !strings.Contains(window, `visible&#34;:false`) &&
+		!strings.Contains(window, `"visible":false`) {
+		t.Fatalf("plan View Chat must honor cookie=0: %s", window)
 	}
 	if !strings.Contains(body, `id="agent-chat-composer"`) {
 		t.Fatalf("missing N=0 composer: %s", body)
@@ -819,18 +819,13 @@ func TestServeAI470RoomForcesArtifactOpenOnPlanViewChat(t *testing.T) {
 	if strings.Contains(body, `id="thread-chat"`) {
 		t.Fatal("plan GET must not auto click-in")
 	}
-	found := false
 	for _, ck := range rec.Result().Cookies() {
 		if ck.Name == "wb2_artifact_open" && ck.Value == "1" {
-			found = true
-			break
+			t.Fatalf(
+				"must not clobber cookie=0 with Set-Cookie 1, got %#v",
+				rec.Result().Cookies(),
+			)
 		}
-	}
-	if !found {
-		t.Fatalf(
-			"expected Set-Cookie wb2_artifact_open=1, got %#v",
-			rec.Result().Cookies(),
-		)
 	}
 }
 
