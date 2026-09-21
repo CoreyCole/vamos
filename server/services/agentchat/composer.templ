@@ -85,7 +85,20 @@ templ AgentChatComposer(args AgentChatComposerArgs) {
 				<div class="col-start-1 row-start-1 group-data-[multiline=1]:row-start-2">
 					@ComposerMetadataButton(args)
 				</div>
-				<textarea id={ args.InputID } rows="1" class="col-start-2 row-start-1 min-h-8 min-w-0 w-full resize-none overflow-y-auto bg-transparent px-1 py-0 text-[13px] leading-8 text-foreground outline-none placeholder:text-muted-foreground group-data-[multiline=1]:col-span-full group-data-[multiline=1]:col-start-1 group-data-[multiline=1]:leading-6" placeholder={ args.Placeholder } data-bind={ args.DraftSignal } data-ignore-morph data-init={ composerAutosizeJS() } data-on:input__debounce.500ms={ args.DraftSaveAction } data-on:input={ composerInputHandler(args) } data-on:keydown="if (evt.key === 'Enter' && !evt.shiftKey) { evt.preventDefault(); el.form.requestSubmit() }"></textarea>
+				<textarea
+					id={ args.InputID }
+					rows="1"
+					class="col-start-2 row-start-1 min-h-8 min-w-0 w-full resize-none overflow-y-auto bg-transparent px-1 py-0 text-[13px] leading-8 text-foreground outline-none placeholder:text-muted-foreground group-data-[multiline=1]:col-span-full group-data-[multiline=1]:col-start-1 group-data-[multiline=1]:leading-6"
+					placeholder={ args.Placeholder }
+					data-bind={ args.DraftSignal }
+					data-ignore-morph
+					data-init={ composerAutosizeJS() }
+					data-on:input={ composerInputHandler(args) }
+					data-on:keydown="if (evt.key === 'Enter' && !evt.shiftKey) { evt.preventDefault(); el.form.requestSubmit() }"
+					if strings.TrimSpace(args.DraftSaveAction) != "" {
+						data-on:input__debounce.500ms={ args.DraftSaveAction }
+					}
+				></textarea>
 				<button type="button" class="col-start-3 row-start-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground group-data-[multiline=1]:row-start-2" aria-label="Voice message" title="Voice message">
 					<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3zM19 10v2a7 7 0 01-14 0v-2M12 19v3"></path>

@@ -44,8 +44,14 @@ func TestEmptyScopeComposerUsesAgentChatComposer(t *testing.T) {
 	if !strings.Contains(html, ">plan<") {
 		t.Fatalf("plan N=0 Mode must be plan: %s", html)
 	}
+	if !strings.Contains(html, `id="agent-chat-composer-input"`) {
+		t.Fatalf("empty-scope composer missing input id: %s", html)
+	}
+	if strings.Contains(html, `data-on:input__debounce.500ms=""`) ||
+		strings.Contains(html, `data-on:input__debounce.500ms`) {
+		t.Fatalf("empty-scope composer must omit empty draft debounce: %s", html)
+	}
 }
-
 
 func TestEmptyScopeComposerDocsDeskModeIsDocs(t *testing.T) {
 	t.Parallel()
