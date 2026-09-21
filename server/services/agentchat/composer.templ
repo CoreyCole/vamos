@@ -58,24 +58,25 @@ templ AgentChatComposer(args AgentChatComposerArgs) {
 				<button type="button" class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" data-on:click="$chatQuoteText = ''; $chatQuotePath = ''" aria-label="Dismiss quote" title="Dismiss quote">×</button>
 			</div>
 		</div>
-		<div id="agent-chat-composer-attachments" class="flex flex-wrap items-center gap-1 pb-2">
-			for _, annotation := range args.SelectedAnnotations {
-				<span class="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-200">Annotation: { annotation.Label }</span>
-			}
-			for _, attached := range args.AttachedPaths {
-				<input type="hidden" name="attached_paths[]" value={ attached.Path }/>
-				<span class="rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground">{ attached.Basename }</span>
-			}
-			if args.ShowCurrentDocToggle && args.DocPath != "" && args.WorkspaceID != "" {
-				<button type="button" class="ml-auto rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" data-on:click={ embeddedAttachDocAction(args.WorkspaceID, args.ThreadID, args.HasThread) }>
-					if args.CurrentDocAttached {
-						Remove current doc
-					} else {
-						Add current doc
-					}
-				</button>
-			}
-		</div>
+		for _, attached := range args.AttachedPaths {
+			<input type="hidden" name="attached_paths[]" value={ attached.Path }/>
+		}
+		if len(args.SelectedAnnotations) > 0 || (args.ShowCurrentDocToggle && args.DocPath != "" && args.WorkspaceID != "") {
+			<div id="agent-chat-composer-attachments" class="flex flex-wrap items-center gap-1 pb-2">
+				for _, annotation := range args.SelectedAnnotations {
+					<span class="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-200">Annotation: { annotation.Label }</span>
+				}
+				if args.ShowCurrentDocToggle && args.DocPath != "" && args.WorkspaceID != "" {
+					<button type="button" class="ml-auto rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" data-on:click={ embeddedAttachDocAction(args.WorkspaceID, args.ThreadID, args.HasThread) }>
+						if args.CurrentDocAttached {
+							Remove current doc
+						} else {
+							Add current doc
+						}
+					</button>
+				}
+			</div>
+		}
 		<div class="relative">
 			if !args.HideSlash {
 				<div id="agent-chat-slash-popover" class="absolute bottom-full left-0 z-30 mb-2 hidden max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-popover p-2 shadow-lg" data-show="$slashOpen"></div>
@@ -105,9 +106,9 @@ templ AgentChatComposer(args AgentChatComposerArgs) {
 templ ComposerMetadataButton(args AgentChatComposerArgs) {
 	{{ dropdownID := composerMetadataDropdownID(args.FormID) }}
 	@dropdown.DropdownMenu(dropdown.DropdownMenuArgs{ID: dropdownID, Class: "shrink-0"}) {
-		@dropdown.DropdownMenuTrigger(dropdown.DropdownMenuTriggerArgs{ID: dropdownID, Class: "inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground", Attributes: templ.Attributes{"aria-label": "Add", "title": "Add"}}) {
+		@dropdown.DropdownMenuTrigger(dropdown.DropdownMenuTriggerArgs{ID: dropdownID, Class: "inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground", Attributes: templ.Attributes{"aria-label": "Info", "title": "Info"}}) {
 			<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14M5 12h14"></path>
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
 			</svg>
 		}
 		@dropdown.DropdownMenuContent(dropdown.DropdownMenuContentArgs{ID: dropdownID, Side: "top", Align: "start", SideOffset: 8, Class: "w-80 max-w-[calc(100vw-2rem)] space-y-3 p-3 text-xs"}) {
@@ -120,6 +121,16 @@ templ ThreadMetadataPopover(args AgentChatComposerArgs) {
 	{{ view := args.ThreadMetadata }}
 	<p class="font-semibold text-foreground">Chat metadata</p>
 	<dl class="mt-2 space-y-1">
+		if len(args.AttachedPaths) > 0 {
+			<div>
+				<dt class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Attached files</dt>
+				<dd class="space-y-1">
+					for _, attached := range args.AttachedPaths {
+						<div class="break-all text-foreground">{ attached.Basename }</div>
+					}
+				</dd>
+			</div>
+		}
 		<div>
 			<dt class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Mode</dt>
 			<dd class="break-all text-foreground">{ args.ModeLabel }</dd>

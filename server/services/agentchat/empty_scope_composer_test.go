@@ -27,9 +27,17 @@ func TestEmptyScopeComposerUsesAgentChatComposer(t *testing.T) {
 		`name="attached_paths[]"`,
 		`AGENTS.md`,
 		`name="artifact"`,
+		`aria-label="Info"`,
+		`title="Info"`,
+		`Attached files`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("empty-scope composer missing %q: %s", want, html)
+		}
+	}
+	for _, unwanted := range []string{`aria-label="Add"`, `title="Add"`} {
+		if strings.Contains(html, unwanted) {
+			t.Fatalf("empty-scope composer still has %q: %s", unwanted, html)
 		}
 	}
 }
