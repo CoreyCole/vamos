@@ -91,7 +91,7 @@ func (s *Service) thoughtsWorkbenchChatColumn(
 	}
 	return column(
 		threadsOpen,
-		true,
+		workbench.ArtifactOpenFromRequest(c.Request()),
 		title,
 		body,
 		overflow,
@@ -387,9 +387,10 @@ func (s *Service) ServeThread(c echo.Context) error {
 	}
 	hasSplitArtifact := planLinked ||
 		c.Request().URL.Query().Has("artifact")
-	artifactOpen := hasSplitArtifact &&
+	paneMounted := hasSplitArtifact || sel.Kind == agenthome.KindDM
+	artifactOpen := paneMounted &&
 		workbench.ArtifactOpenFromRequest(c.Request())
-	if !hasSplitArtifact {
+	if !hasSplitArtifact && sel.Kind != agenthome.KindDM {
 		commentsOpen = false
 	}
 	state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{

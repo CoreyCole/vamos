@@ -126,6 +126,15 @@ func RegionSSRFlexStyle(state WorkbenchState, region WorkbenchRegion) string {
 	if !region.Visible || state.ViewportClass == ViewportMobile {
 		return ""
 	}
+	switch region.ID {
+	case WorkbenchV2ChatRegionID:
+		return "flex: 1 1 0%"
+	case WorkbenchV2ArtifactRegionID:
+		if region.Ratio <= 0 {
+			return ""
+		}
+		return fmt.Sprintf("flex: 0 0 %.2f%%", region.Ratio*100)
+	}
 	switch region.Slot {
 	case WorkbenchSlotNavigation:
 		if region.Ratio <= 0 {
@@ -133,7 +142,7 @@ func RegionSSRFlexStyle(state WorkbenchState, region WorkbenchRegion) string {
 		}
 		return fmt.Sprintf("flex: 0 0 %.2f%%", region.Ratio*100)
 	case WorkbenchSlotContext:
-		// Closed details: chat must grow so #workbench-v2-artifact takes no width.
+		// Comments (chat already handled): grow when details are closed.
 		if !regionPrimaryVisible(state) {
 			return "flex: 1 1 0%"
 		}
@@ -142,7 +151,10 @@ func RegionSSRFlexStyle(state WorkbenchState, region WorkbenchRegion) string {
 		}
 		return fmt.Sprintf("flex: 0 0 %.2f%%", region.Ratio*100)
 	case WorkbenchSlotPrimary:
-		return "flex: 1 1 0%"
+		if region.Ratio <= 0 {
+			return ""
+		}
+		return fmt.Sprintf("flex: 0 0 %.2f%%", region.Ratio*100)
 	default:
 		return ""
 	}

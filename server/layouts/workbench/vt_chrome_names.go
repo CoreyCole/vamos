@@ -68,6 +68,15 @@ func WorkbenchV2ChromeNames() []VTChromeName {
 			DocsMedia: "desktop (`max-md:hidden`)",
 		},
 		{
+			Selector:  "#workbench-v2-artifact-reopen",
+			Name:      "workbench-v2-artifact-reopen",
+			Media:     VTChromeMediaDesktop,
+			Class:     chrome,
+			Freeze:    true,
+			ProbeKey:  "artifactReopen",
+			DocsMedia: "desktop",
+		},
+		{
 			Selector:    "#workbench-v2-chat",
 			Name:        "workbench-v2-chat",
 			Media:       VTChromeMediaAll,

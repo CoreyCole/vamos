@@ -164,6 +164,7 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 					<span class="sr-only">Close details</span>
 				</button>
 			}
+			@workbench.ArtifactDetailsPrimaryControl()
 			if browser.HeaderActions != nil {
 				@browser.HeaderActions
 			}

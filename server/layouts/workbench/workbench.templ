@@ -85,10 +85,35 @@ templ ArtifactReopenControl(artifactOpen bool, controlID string) {
 				aria-pressed="false"
 			}
 		>
-			<span aria-hidden="true" class="font-mono text-[11px] leading-none">&lt;&lt;</span>
+			<span
+				aria-hidden="true"
+				class={ "font-mono text-[11px] leading-none", templ.KV("hidden", artifactOpen) }
+				data-show="!$workbench.regions.workbenchV2Artifact.visible"
+			>&lt;&lt;</span>
+			<span
+				aria-hidden="true"
+				class={ "font-mono text-[11px] leading-none", templ.KV("hidden", !artifactOpen) }
+				data-show="$workbench.regions.workbenchV2Artifact.visible"
+			>&gt;&gt;</span>
 			<span class="sr-only">Details</span>
 		</button>
 	</div>
+}
+
+// ArtifactDetailsPrimaryControl — >> immediately left of the details kebab (open pane).
+templ ArtifactDetailsPrimaryControl() {
+	<button
+		type="button"
+		data-testid="artifact-details-primary"
+		class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+		data-on:click={ ArtifactToggleClickAction() }
+		aria-controls="workbench-v2-artifact"
+		aria-label={ ArtifactHideControlTitle() }
+		title={ ArtifactHideControlTitle() }
+	>
+		<span aria-hidden="true" class="font-mono text-[11px] leading-none">&gt;&gt;</span>
+		<span class="sr-only">Close details</span>
+	</button>
 }
 
 // ChatColumnWithReopen wraps middle-column chat with an in-shell chat header row.

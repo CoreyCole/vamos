@@ -46,6 +46,9 @@ func TestWorkbenchV2ChromeNamesStableShape(t *testing.T) {
 	if desktop["threadsReopen"] != "workbench-v2-threads-reopen" {
 		t.Fatalf("desktop missing threadsReopen: %#v", desktop)
 	}
+	if desktop["artifactReopen"] != "workbench-v2-artifact-reopen" {
+		t.Fatalf("desktop missing artifactReopen: %#v", desktop)
+	}
 	if desktop["chatComments"] != "none" {
 		t.Fatalf("desktop chatComments must be none: %#v", desktop)
 	}

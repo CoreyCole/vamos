@@ -234,3 +234,44 @@ func TestThoughtsDocHonorsChatOpenCookieZero(t *testing.T) {
 		t.Fatal("wb2_chat_open=0 must keep chat closed")
 	}
 }
+
+func TestThoughtsDocHonorsArtifactOpenCookieZero(t *testing.T) {
+	root := t.TempDir()
+	mustMkdirAll(t, filepath.Join(root, "docs", "vamos"))
+	mustWriteFile(
+		t,
+		filepath.Join(root, "docs", "vamos", "index.html"),
+		[]byte("<html></html>"),
+	)
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{ensureID: "thread-docs"})
+
+	e := echo.New()
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/thoughts/docs/vamos/index.html",
+		nil,
+	)
+	req.AddCookie(&http.Cookie{Name: workbench.ArtifactOpenCookie, Value: "0"})
+	c := e.NewContext(req, httptest.NewRecorder())
+	page := &PageArgs{
+		FilePath:  "docs/vamos/index.html",
+		UserEmail: "t@example.com",
+	}
+	state, err := svc.buildThoughtsV2WorkbenchState(c, page)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var artifactVisible bool
+	for _, region := range state.Regions {
+		if region.ID == workbench.WorkbenchV2ArtifactRegionID {
+			artifactVisible = region.Visible
+		}
+	}
+	if artifactVisible {
+		t.Fatal("wb2_artifact_open=0 must not force ArtifactOpen true")
+	}
+}

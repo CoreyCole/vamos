@@ -14,6 +14,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/CoreyCole/vamos/pkg/agents/roster"
+	"github.com/CoreyCole/vamos/server/layouts/workbench"
 	"github.com/CoreyCole/vamos/server/services/agenthome"
 	servicedb "github.com/CoreyCole/vamos/server/services/db"
 )
@@ -404,6 +405,57 @@ func TestServeThreadBotScopedShowsMemoryPane(t *testing.T) {
 	}
 	if strings.Contains(body, "Select a thread to view an artifact.") {
 		t.Fatalf("placeholder artifact: %s", body)
+	}
+	if !strings.Contains(body, `id="workbench-v2-artifact"`) {
+		t.Fatalf("missing cookie defaults memory pane open: %s", body)
+	}
+}
+
+func TestServeThreadBotMemoryHonorsArtifactCookieClosed(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	mustMkdirAll(t, filepath.Join(root, "owner", "plans", "alpha"))
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "agents.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dbSvc.Close() })
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithQueries(dbSvc.Queries)
+	withTestRoster(t, svc)
+	nova, err := svc.createAgent(context.Background(), createAgentInput{
+		Slug: "nova", Name: "Nova", UserEmail: "t@example.com",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	threadID, err := svc.ensureBotHomeThread(context.Background(), nova, "t@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{})
+	req := httptest.NewRequest(http.MethodGet, "/threads/"+threadID, nil)
+	req.AddCookie(&http.Cookie{Name: workbench.ArtifactOpenCookie, Value: "0"})
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(req, rec)
+	c.SetParamNames("threadID")
+	c.SetParamValues(threadID)
+	c.Set("user_email", "t@example.com")
+	if err := svc.ServeThread(c); err != nil {
+		t.Fatal(err)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `id="agent-profile-pane"`) {
+		t.Fatalf("memory pane still mounts: %s", body)
+	}
+	if !strings.Contains(body, `md:!hidden`) {
+		t.Fatalf("cookie=0 must close details column: %s", body)
 	}
 }
 

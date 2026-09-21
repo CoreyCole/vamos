@@ -753,6 +753,38 @@ func TestPathHeaderThreadsOmitCloseDetails(t *testing.T) {
 	}
 }
 
+func TestPathHeaderOpenPaneHasDetailsPrimaryLeftOfKebab(t *testing.T) {
+	var body strings.Builder
+	if err := ThreadArtifactPane(
+		ThreadArtifactBrowserArgs{
+			ThreadID:         "thread-1",
+			DocPath:          "owner/plans/alpha/design.md",
+			ShowCloseDetails: false,
+			HeaderActions: BuildThreadArtifactHeaderActions(
+				nil,
+				"owner/plans/alpha/design.md",
+			),
+		},
+		templ.Raw("<p>doc</p>"),
+	).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	header := artifactPathHeader(t, body.String())
+	if strings.Contains(header, `data-testid="artifact-close-details"`) {
+		t.Fatalf("V2 must not paint artifact-close-details:\n%s", header)
+	}
+	primary := strings.Index(header, `data-testid="artifact-details-primary"`)
+	kebab := strings.Index(header, `data-testid="workbench-overflow-actions"`)
+	if primary < 0 || kebab < 0 || primary > kebab {
+		t.Fatalf(
+			"primary >> must sit left of details kebab: primary=%d kebab=%d\n%s",
+			primary,
+			kebab,
+			header,
+		)
+	}
+}
+
 func TestPathHeaderHidesCloseDetailsWhenDisabled(t *testing.T) {
 	var body strings.Builder
 	if err := ThreadArtifactPane(

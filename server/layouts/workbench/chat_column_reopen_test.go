@@ -125,6 +125,9 @@ func TestChatColumnArtifactReopenWhenClosed(t *testing.T) {
 		!strings.Contains(out, "Details") {
 		t.Fatalf("want icon-only details toggle with sr-only: %s", out)
 	}
+	if !strings.Contains(out, "&lt;&lt;") {
+		t.Fatalf("closed details toggle must show <<: %s", out)
+	}
 }
 
 func TestChatColumnArtifactToggleVisibleWhenOpen(t *testing.T) {
@@ -156,6 +159,19 @@ func TestChatColumnArtifactToggleVisibleWhenOpen(t *testing.T) {
 	}
 	if !strings.Contains(out, `aria-pressed="true"`) {
 		t.Fatalf("open details toggle must be pressed: %s", out)
+	}
+	reopenIdx := strings.Index(out, `id="workbench-v2-artifact-reopen"`)
+	kebabIdx := strings.Index(out, `data-testid="workbench-overflow-actions"`)
+	if reopenIdx < 0 || kebabIdx < 0 || reopenIdx > kebabIdx {
+		t.Fatalf(
+			">> must sit left of chat kebab: reopen=%d kebab=%d",
+			reopenIdx,
+			kebabIdx,
+		)
+	}
+	slice := out[reopenIdx:kebabIdx]
+	if !strings.Contains(slice, "&gt;&gt;") {
+		t.Fatalf("open details toggle must show >> left of kebab: %s", slice)
 	}
 }
 

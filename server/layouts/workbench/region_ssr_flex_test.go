@@ -58,8 +58,17 @@ func TestRegionSSRFlexStyle_ThreadsWidthIndependentOfChat(t *testing.T) {
 		closed,
 		regionByID(t, closed, WorkbenchV2ArtifactRegionID),
 	)
-	if artifactOpen != "flex: 1 1 0%" || artifactClosed != "flex: 1 1 0%" {
-		t.Fatalf("artifact flex open=%q closed=%q", artifactOpen, artifactClosed)
+	if !strings.HasPrefix(artifactOpen, "flex: 0 0 ") ||
+		!strings.HasSuffix(artifactOpen, "%") {
+		t.Fatalf("open artifact must be sidecar 0 0 ratio, got %q", artifactOpen)
+	}
+	if !strings.HasPrefix(artifactClosed, "flex: 0 0 ") ||
+		!strings.HasSuffix(artifactClosed, "%") {
+		t.Fatalf("chat-closed artifact must stay sidecar, got %q", artifactClosed)
+	}
+	chatOpenFlex := RegionSSRFlexStyle(open, regionByID(t, open, WorkbenchV2ChatRegionID))
+	if chatOpenFlex != "flex: 1 1 0%" {
+		t.Fatalf("chat must grow, got %q", chatOpenFlex)
 	}
 }
 
@@ -76,7 +85,10 @@ func TestRegionSSRFlexStyle_ClosedArtifactChatFills(t *testing.T) {
 		t.Fatal("artifact should be closed")
 	}
 	if RegionSSRFlexStyle(state, artifact) != "" {
-		t.Fatalf("closed artifact must omit flex, got %q", RegionSSRFlexStyle(state, artifact))
+		t.Fatalf(
+			"closed artifact must omit flex, got %q",
+			RegionSSRFlexStyle(state, artifact),
+		)
 	}
 	if got := RegionInitialClass(state, artifact); !strings.Contains(got, "md:!hidden") ||
 		!strings.Contains(got, "hidden") {
@@ -84,7 +96,29 @@ func TestRegionSSRFlexStyle_ClosedArtifactChatFills(t *testing.T) {
 	}
 	chat := regionByID(t, state, WorkbenchV2ChatRegionID)
 	if RegionSSRFlexStyle(state, chat) != "flex: 1 1 0%" {
-		t.Fatalf("chat should grow when details closed, got %q", RegionSSRFlexStyle(state, chat))
+		t.Fatalf(
+			"chat should grow when details closed, got %q",
+			RegionSSRFlexStyle(state, chat),
+		)
+	}
+	openState, err := BuildWorkbenchV2State(WorkbenchV2Args{
+		ThreadsOpen: true, ChatOpen: true, ArtifactOpen: true, CommentsOpen: false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if RegionSSRFlexStyle(
+		openState,
+		regionByID(t, openState, WorkbenchV2ChatRegionID),
+	) != "flex: 1 1 0%" {
+		t.Fatal("open chat must still grow")
+	}
+	openArt := RegionSSRFlexStyle(
+		openState,
+		regionByID(t, openState, WorkbenchV2ArtifactRegionID),
+	)
+	if !strings.HasPrefix(openArt, "flex: 0 0 ") {
+		t.Fatalf("open artifact sidecar, got %q", openArt)
 	}
 }
 
