@@ -250,6 +250,52 @@ func TestCommentableMarkdownOmitsWhoCommentedWhenSectionHasNoComments(t *testing
 	}
 }
 
+func TestCommentableMarkdownOmitsEmptyKeydownWindowHandler(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	args := CommentableMarkdownArgs{
+		Surface:  CommentSurfaceThoughts,
+		IDPrefix: SafeCommentTargetSlug("thoughts", "thoughts/plan.md"),
+		DocPath:  "thoughts/plan.md",
+		HTML:     "<p>Hello</p>",
+		Routes:   CommentRoutes{Show: "/show"},
+	}
+	if err := CommentableMarkdown(args).Render(t.Context(), &buf); err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	html := buf.String()
+	if strings.Contains(html, `data-on:keydown__window=""`) {
+		t.Fatalf(
+			"empty data-on:keydown__window would trip Datastar ValueRequired: %s",
+			html,
+		)
+	}
+	if strings.Contains(html, `data-on:mouseup__debounce.500ms.leading=""`) {
+		t.Fatalf("empty mouseup debounce would trip Datastar ValueRequired: %s", html)
+	}
+
+	buf.Reset()
+	if err := CommentableSelectionHTML(args).Render(t.Context(), &buf); err != nil {
+		t.Fatalf("CommentableSelectionHTML Render() error = %v", err)
+	}
+	html = buf.String()
+	if strings.Contains(html, `data-on:keydown__window=""`) {
+		t.Fatalf("selection HTML empty data-on:keydown__window: %s", html)
+	}
+
+	buf.Reset()
+	if err := FrameCommentBridge(
+		FrameCommentBridgeArgs{Comments: args},
+	).Render(t.Context(), &buf); err != nil {
+		t.Fatalf("FrameCommentBridge Render() error = %v", err)
+	}
+	html = buf.String()
+	if strings.Contains(html, `data-on:keydown__window=""`) {
+		t.Fatalf("frame bridge empty data-on:keydown__window: %s", html)
+	}
+}
+
 func TestCommentableSelectionHTMLRendersSelectionOnlyChrome(t *testing.T) {
 	t.Parallel()
 

@@ -243,7 +243,16 @@ templ DocumentPatchTarget(args CommentableMarkdownArgs, headingHint string) {
 
 templ CommentableMarkdown(args CommentableMarkdownArgs) {
 	<div class="relative min-h-full" data-signals="{}">
-		<div class="relative min-h-full min-w-0 pl-7 pr-16" data-commentui-container="true" data-on:keydown__window={ selectionKeydownExpr(args.SelectionSignals) } data-on:mouseup__debounce.500ms.leading={ selectionMouseupExpr(args.SelectionSignals) }>
+		<div
+			class="relative min-h-full min-w-0 pl-7 pr-16"
+			data-commentui-container="true"
+			if keydown := selectionKeydownExpr(args.SelectionSignals); keydown != "" {
+				data-on:keydown__window={ keydown }
+			}
+			if mouseup := selectionMouseupExpr(args.SelectionSignals); mouseup != "" {
+				data-on:mouseup__debounce.500ms.leading={ mouseup }
+			}
+		>
 			if len(args.Sections) > 0 {
 				{{ documentThreads := DocumentComments(args.Comments) }}
 				if len(documentThreads) > 0 {
@@ -318,7 +327,16 @@ templ CommentableSelectionHTML(args CommentableMarkdownArgs) {
 		documentTarget.SelectionSignalPrefix = selection.Prefix
 	}}
 	<div class="relative h-full min-h-full" data-signals="{}">
-		<div class="relative h-full min-h-full min-w-0" data-commentui-container="true" data-on:keydown__window={ selectionKeydownExpr(selection) } data-on:mouseup__debounce.500ms.leading={ selectionMouseupExpr(selection) }>
+		<div
+			class="relative h-full min-h-full min-w-0"
+			data-commentui-container="true"
+			if keydown := selectionKeydownExpr(selection); keydown != "" {
+				data-on:keydown__window={ keydown }
+			}
+			if mouseup := selectionMouseupExpr(selection); mouseup != "" {
+				data-on:mouseup__debounce.500ms.leading={ mouseup }
+			}
+		>
 			<div class="h-full min-h-full w-full">
 				@templ.Raw(args.HTML)
 			</div>
@@ -879,7 +897,9 @@ templ FrameCommentBridge(args FrameCommentBridgeArgs) {
 		data-commentui-container="true"
 		data-commentui-frame-bridge={ bridgeID }
 		data-commentui-heading-hint={ documentTarget.HeadingHint }
-		data-on:keydown__window={ selectionKeydownExpr(selection) }
+		if keydown := selectionKeydownExpr(selection); keydown != "" {
+			data-on:keydown__window={ keydown }
+		}
 	>
 		if args.Content != nil {
 			@args.Content
