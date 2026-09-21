@@ -113,17 +113,33 @@ func RegionSurfaceClass(region WorkbenchRegion) string {
 	return "bg-[#070707]"
 }
 
+func regionPrimaryVisible(state WorkbenchState) bool {
+	for _, r := range state.Regions {
+		if r.Visible && r.Slot == WorkbenchSlotPrimary {
+			return true
+		}
+	}
+	return false
+}
+
 func RegionSSRFlexStyle(state WorkbenchState, region WorkbenchRegion) string {
 	if !region.Visible || state.ViewportClass == ViewportMobile {
 		return ""
 	}
 	switch region.Slot {
-	case WorkbenchSlotNavigation, WorkbenchSlotContext:
+	case WorkbenchSlotNavigation:
 		if region.Ratio <= 0 {
 			return ""
 		}
-		// Absolute design share of the full workbench — freeze nav/context so
-		// opening chat/comments steals from primary, not by renormalizing threads.
+		return fmt.Sprintf("flex: 0 0 %.2f%%", region.Ratio*100)
+	case WorkbenchSlotContext:
+		// Closed details: chat must grow so #workbench-v2-artifact takes no width.
+		if !regionPrimaryVisible(state) {
+			return "flex: 1 1 0%"
+		}
+		if region.Ratio <= 0 {
+			return ""
+		}
 		return fmt.Sprintf("flex: 0 0 %.2f%%", region.Ratio*100)
 	case WorkbenchSlotPrimary:
 		return "flex: 1 1 0%"

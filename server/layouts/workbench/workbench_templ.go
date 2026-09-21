@@ -107,7 +107,7 @@ func Workbench(state WorkbenchState) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" class=\"flex h-full min-h-0 w-full overflow-hidden p-0\"><script type=\"module\" src=\"/js/workbench-resize.js?v=18\"></script><script type=\"module\" src=\"/js/workbench-history.js?v=23\"></script><script type=\"module\" src=\"/js/workbench-doc-scroll.js?v=3\"></script><script defer src=\"/js/frame-comment-bridge.js?v=4\" data-commentui-mode=\"parent\"></script><div class=\"flex min-h-0 w-full flex-col gap-0 overflow-hidden\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" class=\"flex h-full min-h-0 w-full overflow-hidden p-0\"><script type=\"module\" src=\"/js/workbench-resize.js?v=19\"></script><script type=\"module\" src=\"/js/workbench-history.js?v=23\"></script><script type=\"module\" src=\"/js/workbench-doc-scroll.js?v=3\"></script><script defer src=\"/js/frame-comment-bridge.js?v=4\" data-commentui-mode=\"parent\"></script><div class=\"flex min-h-0 w-full flex-col gap-0 overflow-hidden\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

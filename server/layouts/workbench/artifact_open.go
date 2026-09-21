@@ -52,20 +52,25 @@ func artifactOpenCookieWriteJS(open bool) string {
 		"'workbench-v2:artifact-open', '" + v + "') } catch (e) {}"
 }
 
+func artifactLayoutReflowJS() string {
+	return "if (window.workbenchApplyRegionVisible) { workbenchApplyRegionVisible('workbench-v2-artifact', $workbench.regions.workbenchV2Artifact.visible) }; " +
+		threadsLayoutReflowJS()
+}
+
 // ArtifactHideClickAction collapses the artifact pane and persists via cookie.
-// Signal + cookie + layout-reflow only — do not call workbenchApplyRegionVisible
-// or workbenchReflow here; those grow chat and slide the details toggle.
+// Hide via applyRegionVisible (display none) + layout reflow so chat flex-grows.
+// Do not call workbenchReflow() — that pixel-locks and slides the header toggle.
 func ArtifactHideClickAction() string {
 	return "$workbench.regions.workbenchV2Artifact.visible = false; " +
 		artifactOpenCookieWriteJS(false) + "; " +
-		threadsLayoutReflowJS()
+		artifactLayoutReflowJS()
 }
 
 // ArtifactShowClickAction reopens the artifact pane and persists via cookie.
 func ArtifactShowClickAction() string {
 	return "$workbench.regions.workbenchV2Artifact.visible = true; " +
 		artifactOpenCookieWriteJS(true) + "; " +
-		threadsLayoutReflowJS()
+		artifactLayoutReflowJS()
 }
 
 // ArtifactToggleClickAction opens or closes details and persists the cookie.

@@ -44,6 +44,7 @@ func TestArtifactHideShowActionsWriteCookie(t *testing.T) {
 		"workbenchV2Artifact.visible = false",
 		ArtifactOpenCookie + "=0",
 		"workbench-layout-reflow",
+		"workbenchApplyRegionVisible('workbench-v2-artifact'",
 	} {
 		if !strings.Contains(hide, want) {
 			t.Fatalf("hide missing %q in %s", want, hide)
@@ -53,15 +54,15 @@ func TestArtifactHideShowActionsWriteCookie(t *testing.T) {
 		"workbenchV2Artifact.visible = true",
 		ArtifactOpenCookie + "=1",
 		"workbench-layout-reflow",
+		"workbenchApplyRegionVisible('workbench-v2-artifact'",
 	} {
 		if !strings.Contains(show, want) {
 			t.Fatalf("show missing %q in %s", want, show)
 		}
 	}
 	for _, action := range []string{hide, show, toggle} {
-		if strings.Contains(action, "workbenchApplyRegionVisible") ||
-			strings.Contains(action, "workbenchReflow()") {
-			t.Fatalf("must not grow chat / slide toggle: %s", action)
+		if strings.Contains(action, "workbenchReflow()") {
+			t.Fatalf("must not pixel-lock via workbenchReflow: %s", action)
 		}
 	}
 	if !strings.Contains(toggle, "visible === false") {

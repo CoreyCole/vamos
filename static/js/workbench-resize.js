@@ -198,10 +198,26 @@ function applyRegionRatios(root) {
 
   const primary = regions.find((region) => regionSlot(region) === "primary");
   if (!primary) {
-    for (const region of regions) {
+    if (regions.length === 0) return;
+    let used = 0;
+    for (let i = 0; i < regions.length - 1; i++) {
+      const region = regions[i];
+      const lastMin = regionMinWidth(regions[regions.length - 1]);
       const ratio = Number(region.dataset.workbenchRatio || 0);
-      setRegionWidth(region, ratio * availableWidth);
+      const width = clampRegionWidth(
+        region,
+        ratio * availableWidth,
+        availableWidth,
+        lastMin,
+      );
+      region.dataset.workbenchWidthPx = width.toFixed(2);
+      setRegionWidth(region, width);
+      used += width;
     }
+    const last = regions[regions.length - 1];
+    const lastWidth = Math.max(regionMinWidth(last), availableWidth - used);
+    last.dataset.workbenchWidthPx = lastWidth.toFixed(2);
+    setRegionWidth(last, lastWidth);
     return;
   }
 
@@ -503,10 +519,12 @@ function reflowVisibleRegionFlex(root) {
     return;
   }
   const regions = visibleRegions(root);
+  const hasPrimary = regions.some((region) => regionSlot(region) === "primary");
+  const growTarget = hasPrimary ? null : regions[regions.length - 1];
   for (const region of regions) {
     const slot = regionSlot(region);
     const ratio = Number(region.dataset.workbenchRatio || 0);
-    if (slot === "primary") {
+    if (slot === "primary" || region === growTarget) {
       region.style.flex = "1 1 0%";
     } else if (ratio > 0) {
       region.style.flex = "0 0 " + (ratio * 100).toFixed(2) + "%";

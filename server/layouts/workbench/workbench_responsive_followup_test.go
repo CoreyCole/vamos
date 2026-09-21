@@ -83,7 +83,7 @@ func TestWorkbenchV2ThreadsHasIndependentHideAndReopenControls(t *testing.T) {
 		`aria-label="Roster sidebar (Ctrl+B)"`,
 		`$workbench.regions.workbenchV2Threads.visible === false`,
 		`wb2_threads_open=1`,
-		`/js/workbench-resize.js?v=18`,
+		`/js/workbench-resize.js?v=19`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("workbench threads reopen control missing %q", want)

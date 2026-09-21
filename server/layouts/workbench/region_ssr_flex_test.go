@@ -63,6 +63,31 @@ func TestRegionSSRFlexStyle_ThreadsWidthIndependentOfChat(t *testing.T) {
 	}
 }
 
+func TestRegionSSRFlexStyle_ClosedArtifactChatFills(t *testing.T) {
+	t.Parallel()
+	state, err := BuildWorkbenchV2State(WorkbenchV2Args{
+		ThreadsOpen: true, ChatOpen: true, ArtifactOpen: false, CommentsOpen: false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifact := regionByID(t, state, WorkbenchV2ArtifactRegionID)
+	if artifact.Visible {
+		t.Fatal("artifact should be closed")
+	}
+	if RegionSSRFlexStyle(state, artifact) != "" {
+		t.Fatalf("closed artifact must omit flex, got %q", RegionSSRFlexStyle(state, artifact))
+	}
+	if got := RegionInitialClass(state, artifact); !strings.Contains(got, "md:!hidden") ||
+		!strings.Contains(got, "hidden") {
+		t.Fatalf("closed artifact class = %q", got)
+	}
+	chat := regionByID(t, state, WorkbenchV2ChatRegionID)
+	if RegionSSRFlexStyle(state, chat) != "flex: 1 1 0%" {
+		t.Fatalf("chat should grow when details closed, got %q", RegionSSRFlexStyle(state, chat))
+	}
+}
+
 func regionByID(t *testing.T, state WorkbenchState, id string) WorkbenchRegion {
 	t.Helper()
 	for _, r := range state.Regions {
