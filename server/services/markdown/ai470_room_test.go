@@ -631,6 +631,8 @@ func TestServeAI470RoomBotTwoThreadsListsBoth(t *testing.T) {
 	body := rec.Body.String()
 	for _, want := range []string{
 		`id="scoped-thread-list"`,
+		`id="agent-chat-composer"`,
+		`/rooms/dm/nova/threads`,
 		`href="/threads/` + first + `"`,
 		`href="/threads/` + second + `"`,
 	} {
@@ -1333,8 +1335,15 @@ func TestServeAI470RoomPlanListOmitsUnattachedQRSPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, `href="/threads/`+threadID+`"`) {
-		t.Fatalf("missing plan thread row: %s", body)
+	for _, want := range []string{
+		`id="scoped-thread-list"`,
+		`id="agent-chat-composer"`,
+		`/rooms/plan/plan-one/threads`,
+		`href="/threads/` + threadID + `"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("missing %q: %s", want, body)
+		}
 	}
 	if strings.Contains(body, "hermes/q.jsonl") {
 		t.Fatal("unattached QRSPI session leaked into list")

@@ -2,12 +2,17 @@ package markdown
 
 import "github.com/CoreyCole/vamos/server/services/agenthome"
 
-templ ScopedThreadList(rows []agenthome.ConversationRowArgs) {
+templ ScopedThreadList(rows []agenthome.ConversationRowArgs, footer templ.Component) {
 	<div id="scoped-thread-list" class="flex h-full min-h-0 flex-col bg-background" data-testid="scoped-thread-list">
 		<nav class="min-h-0 flex-1 overflow-y-auto" aria-label="Threads">
 			for _, row := range rows {
 				@agenthome.ConversationRow(row)
 			}
 		</nav>
+		if footer != nil {
+			<div class="shrink-0 border-t border-border/60 bg-background">
+				@footer
+			</div>
+		}
 	</div>
 }

@@ -20,7 +20,9 @@ import (
 // without an import cycle.
 var emptyScopeComposer func(action, attachedDoc, modeLabel string) templ.Component
 
-func SetEmptyScopeComposer(fn func(action, attachedDoc, modeLabel string) templ.Component) {
+func SetEmptyScopeComposer(
+	fn func(action, attachedDoc, modeLabel string) templ.Component,
+) {
 	emptyScopeComposer = fn
 }
 
@@ -28,17 +30,21 @@ func renderScopedThreadListOrComposer(
 	rows []agenthome.ConversationRowArgs,
 	kind, id, attachedDoc string,
 ) templ.Component {
+	var composer templ.Component
+	if emptyScopeComposer != nil {
+		composer = emptyScopeComposer(
+			emptyScopeComposerAction(kind, id),
+			attachedDoc,
+			emptyScopeModeLabel(kind, id, attachedDoc),
+		)
+	}
 	if len(rows) == 0 {
-		if emptyScopeComposer != nil {
-			return emptyScopeComposer(
-				emptyScopeComposerAction(kind, id),
-				attachedDoc,
-				emptyScopeModeLabel(kind, id, attachedDoc),
-			)
+		if composer != nil {
+			return composer
 		}
 		return templ.NopComponent
 	}
-	return ScopedThreadList(rows)
+	return ScopedThreadList(rows, composer)
 }
 
 func (s *Service) requireKnownBot(slug string) error {

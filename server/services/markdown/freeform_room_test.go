@@ -73,6 +73,8 @@ func TestServeFreeformRoomListsEmptyKindRow(t *testing.T) {
 	body := rec.Body.String()
 	for _, want := range []string{
 		`id="scoped-thread-list"`,
+		`id="agent-chat-composer"`,
+		`/rooms/freeform/threads`,
 		`href="/threads/` + threadID + `"`,
 		"Empty kind",
 		`id="roster-row-freeform"`,
@@ -82,8 +84,8 @@ func TestServeFreeformRoomListsEmptyKindRow(t *testing.T) {
 			t.Fatalf("missing %q: %s", want, body)
 		}
 	}
-	if strings.Contains(body, `id="agent-chat-composer"`) {
-		t.Fatal("N=1 must show the list, not composer")
+	if strings.Contains(body, `id="thread-chat"`) {
+		t.Fatal("N=1 must show the list, not click-in chat")
 	}
 }
 
