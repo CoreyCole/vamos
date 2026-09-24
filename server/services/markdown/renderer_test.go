@@ -95,6 +95,25 @@ func TestMarkdownBytesToHTML_LinksInlineThoughtsPath(t *testing.T) {
 	}
 }
 
+func TestMarkdownBytesToHTML_PreservesCurrencyDollarSigns(t *testing.T) {
+	r, err := NewRenderer("github-dark")
+	if err != nil {
+		t.Fatalf("NewRenderer() error = %v", err)
+	}
+
+	md := []byte("The Q1 total is $301,769.10. The Q2 total is $273,778.91.")
+	html, err := r.MarkdownBytesToHTML(md)
+	if err != nil {
+		t.Fatalf("MarkdownBytesToHTML() error = %v", err)
+	}
+	if strings.Contains(html, `\(`) || strings.Contains(html, `\)`) {
+		t.Fatalf("currency dollars were rewritten as math delimiters; html = %s", html)
+	}
+	if !strings.Contains(html, "$301,769.10") || !strings.Contains(html, "$273,778.91") {
+		t.Fatalf("expected currency amounts preserved; html = %s", html)
+	}
+}
+
 func TestMarkdownBytesToHTML_RendersFrontmatterAsYAMLCodeBlock(t *testing.T) {
 	r, err := NewRenderer("github-dark")
 	if err != nil {

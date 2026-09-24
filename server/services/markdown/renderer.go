@@ -25,7 +25,17 @@ import (
 
 const (
 	DefaultCodeStyle = "github-dark"
+
+	// gomarkdown CommonExtensions includes MathJax, which rewrites $...$ to \(...\).
+	// Currency like "$301 ... $273" then displays as literal \( ... \).
+	markdownParserExtensions = (parser.CommonExtensions &^ parser.MathJax) |
+		parser.AutoHeadingIDs |
+		parser.NoEmptyLineBeforeBlock
 )
+
+func newMarkdownParser() *parser.Parser {
+	return parser.NewWithExtensions(markdownParserExtensions)
+}
 
 type Renderer struct {
 	highlightStyle      *chroma.Style
@@ -87,10 +97,7 @@ func (m Renderer) MarkdownBytesToHTMLForDoc(
 ) (string, error) {
 	md = renderableMarkdown(md)
 
-	// Use parser with NoEmptyLineBeforeBlock so lists work without a preceding blank line
-	p := parser.NewWithExtensions(
-		parser.CommonExtensions | parser.AutoHeadingIDs | parser.NoEmptyLineBeforeBlock,
-	)
+	p := newMarkdownParser()
 	state := &renderState{DocRelPath: docRelPath}
 	htmlBytes := markdown.ToHTML(
 		md,
@@ -104,7 +111,7 @@ func (m Renderer) MarkdownBytesToHTMLForDoc(
 }
 
 func (m Renderer) markdownBytesToInlineHTML(md []byte) (string, error) {
-	p := parser.NewWithExtensions(parser.CommonExtensions)
+	p := newMarkdownParser()
 	paragraph := &ast.Paragraph{}
 	p.Inline(paragraph, md)
 
@@ -761,11 +768,7 @@ func (m Renderer) RenderToSectionsForDoc(
 ) ([]Section, error) {
 	md = renderableMarkdown(md)
 
-	// Parse markdown to AST - NoEmptyLineBeforeBlock allows lists without preceding blank
-	// line
-	p := parser.NewWithExtensions(
-		parser.CommonExtensions | parser.AutoHeadingIDs | parser.NoEmptyLineBeforeBlock,
-	)
+	p := newMarkdownParser()
 	doc := p.Parse(md)
 
 	state := &renderState{DocRelPath: docRelPath}

@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gomarkdown/markdown/parser"
-
 	"github.com/CoreyCole/vamos/server"
 	"github.com/CoreyCole/vamos/server/services/commentui"
 )
@@ -46,8 +44,7 @@ func (r MarkdownDocumentRenderer) Render(
 		return RenderedDocument{}, fmt.Errorf("error parsing frontmatter: %w", err)
 	}
 
-	parser := parser.NewWithExtensions(parser.CommonExtensions | parser.AutoHeadingIDs)
-	parsed := parser.Parse(markdownContent)
+	parsed := newMarkdownParser().Parse(markdownContent)
 	toc := r.service.extractTableOfContents(parsed)
 	sections, err := r.renderer.RenderToSectionsForDoc(markdownContent, req.CleanPath)
 	if err != nil {
