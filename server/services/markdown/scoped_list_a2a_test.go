@@ -189,11 +189,11 @@ func TestScopedListsExcludePairwiseA2A(t *testing.T) {
 	t.Run("freeform", func(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := echo.New().NewContext(
-			httptest.NewRequest(http.MethodGet, "/rooms/freeform", http.NoBody),
+			httptest.NewRequest(http.MethodGet, "/threads", http.NoBody),
 			rec,
 		)
 		c.Set("user_email", "t@example.com")
-		if err := svc.ServeFreeformRoom(c); err != nil {
+		if err := svc.ServeThreads(c); err != nil {
 			t.Fatal(err)
 		}
 		body := rec.Body.String()

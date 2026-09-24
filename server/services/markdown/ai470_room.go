@@ -22,79 +22,13 @@ func ServeAgentsLand(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, "/threads")
 }
 
-// ServeFreeformRoom is GET /rooms/freeform: scoped freeform thread list (or N=0 composer).
+// ServeFreeformRoom is GET /rooms/freeform: 302 onto freeform home /threads.
 func (s *Service) ServeFreeformRoom(c echo.Context) error {
-	if s.workbenchThreadsRenderer == nil {
-		return echo.NewHTTPError(
-			http.StatusServiceUnavailable,
-			"thread renderer is not configured",
-		)
+	target := "/threads"
+	if q := strings.TrimSpace(c.Request().URL.RawQuery); q != "" {
+		target += "?" + q
 	}
-	userEmail, _ := c.Get("user_email").(string)
-	_ = userEmail
-	sel := agenthome.RosterSelection{Kind: agenthome.KindFreeform}
-	roomTitle := s.ai470RoomTitle(c.Request().Context(), agenthome.KindFreeform, "")
-	artifactPath, hasArtifact, err := optionalThreadArtifact(c.QueryParam("artifact"))
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	c.Set(artifactThreadsReopenKey, true)
-	viewport := viewportClassForRequest(c)
-	threadsOpen := workbench.ThreadsOpenFromRequest(c.Request())
-	artifactComp, artifactPage, artifactDoc := s.indexArtifactComponent(
-		c, artifactPath, hasArtifact,
-	)
-	commentsComp := WorkbenchUnavailable("Select an artifact to view comments.")
-	artifactChromeOpen := workbench.ArtifactOpenFromRequest(c.Request())
-	rows, listErr := s.freeformScopedConversationRows(c.Request().Context())
-	if listErr != nil {
-		return listErr
-	}
-	if hasArtifact && artifactPage != nil {
-		commentsComp = s.commentsPanelForThoughtsPage(c, artifactPage)
-	}
-	chatComp := chatColumnForAI470Room(
-		agenthome.KindFreeform,
-		threadsOpen,
-		artifactChromeOpen,
-		roomTitle,
-		renderScopedThreadListOrComposer(
-			rows,
-			"freeform",
-			"",
-			artifactPath,
-		),
-		BuildChatHeaderOverflow(artifactPage, artifactDoc, true),
-	)
-	chatOpen, commentsOpen := chatCommentsOpen(c.Request(), true)
-	artifactOpen := hasArtifact
-	if viewport.IsDesktop() {
-		artifactOpen = artifactChromeOpen
-	}
-	if !hasArtifact {
-		commentsOpen = false
-	}
-	state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
-		UserEmail:     userEmail,
-		ViewportClass: viewport,
-		SavedConfig:   s.savedThreadsWorkbenchConfig(c, userEmail, viewport),
-		Threads: agenthome.RosterRail(
-			s.liveRoster(c.Request().Context(), sel),
-		),
-		Chat:         chatComp,
-		Artifact:     artifactComp,
-		Comments:     commentsComp,
-		ThreadsOpen:  threadsOpen,
-		ChatOpen:     chatOpen,
-		ArtifactOpen: artifactOpen,
-		CommentsOpen: commentsOpen,
-	})
-	if err != nil {
-		return err
-	}
-	return ThreadWorkbenchPage(userEmail, state).Render(
-		c.Request().Context(), c.Response().Writer,
-	)
+	return c.Redirect(http.StatusFound, target)
 }
 
 // ServeAI470Room renders leftover V2 workbench with RosterRail left + the same

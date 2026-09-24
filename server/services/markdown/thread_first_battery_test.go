@@ -32,8 +32,6 @@ func TestServeThreadsIndexHasNoChatEnsure(t *testing.T) {
 	for _, bad := range []string{
 		`"Chat"`,
 		">Chat<",
-		`id="agent-chat-composer"`,
-		`id="scoped-thread-list"`,
 		`id="thread-chat"`,
 		`data-testid="root-threads-index"`,
 	} {
@@ -41,8 +39,8 @@ func TestServeThreadsIndexHasNoChatEnsure(t *testing.T) {
 			t.Fatalf("bare GET /threads contains %q", bad)
 		}
 	}
-	if !strings.Contains(body, "Pick a roster scope to see its threads.") {
-		t.Fatalf("missing pick-scope copy: %s", body)
+	if strings.Contains(body, "Pick a roster scope to see its threads.") {
+		t.Fatal("pick-scope copy must not appear on freeform home")
 	}
 }
 

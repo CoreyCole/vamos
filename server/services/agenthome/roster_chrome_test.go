@@ -92,11 +92,11 @@ func TestRosterRail_LiveBotsAndChrome(t *testing.T) {
 	if !strings.Contains(html, `href="/rooms/dm/live-bot"`) {
 		t.Fatal("bot href must be /rooms/dm/{slug}")
 	}
-	if !strings.Contains(html, `href="/rooms/freeform"`) {
-		t.Fatal("roster must expose Freeform navigator /rooms/freeform")
+	if strings.Contains(html, `href="/rooms/freeform"`) {
+		t.Fatal("roster must not expose Freeform navigator /rooms/freeform")
 	}
-	if !strings.Contains(html, `id="roster-row-freeform"`) {
-		t.Fatal("roster must expose Freeform navigator row")
+	if strings.Contains(html, `id="roster-row-freeform"`) {
+		t.Fatal("roster must not expose Freeform navigator row")
 	}
 	if !strings.Contains(html, `data-roster-id="dm:live-bot"`) {
 		t.Fatal("rows must expose data-roster-id for pin JS")

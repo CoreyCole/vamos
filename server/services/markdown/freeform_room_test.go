@@ -9,83 +9,61 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
-	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/server/services/agenthome"
 	servicedb "github.com/CoreyCole/vamos/server/services/db"
 )
 
 func TestServeFreeformRoomListsEmptyKindRow(t *testing.T) {
 	t.Parallel()
-	root := t.TempDir()
-	dbSvc, err := servicedb.NewService(
-		filepath.Join(t.TempDir(), "agents.db"),
-		filepath.Join(t.TempDir(), "agents.yml"),
-	)
+	svc, err := NewService(t.TempDir(), nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = dbSvc.Close() })
-	threadID := uuid.NewString()
-	piID := uuid.NewString()
-	if _, err := dbSvc.Queries.CreateAgentThread(
-		context.Background(),
-		db.CreateAgentThreadParams{
-			ID:          threadID,
-			UserEmail:   "t@example.com",
-			Title:       "Empty kind",
-			Cwd:         filepath.Join(root, "freeform"),
-			LineageID:   uuid.NewString(),
-			PiSessionID: piID,
-		},
-	); err != nil {
-		t.Fatal(err)
-	}
-	writeJSONLUserMessage(
-		t,
-		filepath.Join(root, "freeform", ".vamos", "sessions", "pi", piID+".jsonl"),
-		piID,
-	)
-	svc, err := NewService(root, nil, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	svc.WithQueries(dbSvc.Queries)
-	renderer := &threadWorkbenchTestRenderer{}
-	svc.WithWorkbenchThreadRenderer(renderer)
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(
 		httptest.NewRequest(http.MethodGet, "/rooms/freeform", http.NoBody),
 		rec,
 	)
-	c.Set("user_email", "t@example.com")
 	if err := svc.ServeFreeformRoom(c); err != nil {
 		t.Fatal(err)
 	}
-	if renderer.chatThreadID != "" {
-		t.Fatalf("GET must not auto click-in, got %q", renderer.chatThreadID)
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want 302", rec.Code)
 	}
-	if renderer.ensureFreeform {
-		t.Fatal("GET /rooms/freeform must not ensure a thread")
+	if got := rec.Header().Get("Location"); got != "/threads" {
+		t.Fatalf("Location = %q, want /threads", got)
 	}
-	body := rec.Body.String()
-	for _, want := range []string{
-		`id="scoped-thread-list"`,
-		`id="agent-chat-composer"`,
-		`/rooms/freeform/threads`,
-		`href="/threads/` + threadID + `"`,
-		"Empty kind",
-		`id="roster-row-freeform"`,
-		"roster-row-selected",
-	} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("missing %q: %s", want, body)
-		}
+	if strings.Contains(rec.Body.String(), `id="scoped-thread-list"`) {
+		t.Fatal("GET /rooms/freeform must not render a body list")
 	}
-	if strings.Contains(body, `id="thread-chat"`) {
-		t.Fatal("N=1 must show the list, not click-in chat")
+}
+
+func TestServeFreeformRoomPreservesRawQuery(t *testing.T) {
+	t.Parallel()
+	svc, err := NewService(t.TempDir(), nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(
+		httptest.NewRequest(
+			http.MethodGet,
+			"/rooms/freeform?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fdesign.md",
+			http.NoBody,
+		),
+		rec,
+	)
+	if err := svc.ServeFreeformRoom(c); err != nil {
+		t.Fatal(err)
+	}
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want 302", rec.Code)
+	}
+	want := "/threads?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fdesign.md"
+	if got := rec.Header().Get("Location"); got != want {
+		t.Fatalf("Location = %q, want %q", got, want)
 	}
 }
 
@@ -115,11 +93,11 @@ func TestServeFreeformRoomZeroThreadsComposerDoesNotInsert(t *testing.T) {
 	}
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(
-		httptest.NewRequest(http.MethodGet, "/rooms/freeform", http.NoBody),
+		httptest.NewRequest(http.MethodGet, "/threads", http.NoBody),
 		rec,
 	)
 	c.Set("user_email", "t@example.com")
-	if err := svc.ServeFreeformRoom(c); err != nil {
+	if err := svc.ServeThreads(c); err != nil {
 		t.Fatal(err)
 	}
 	after, err := dbSvc.Queries.ListAgentThreadsFreeform(context.Background())
@@ -135,6 +113,9 @@ func TestServeFreeformRoomZeroThreadsComposerDoesNotInsert(t *testing.T) {
 	}
 	if strings.Contains(body, "/thoughts/chat/freeform/send") {
 		t.Fatal("N=0 composer must not wire freeform send")
+	}
+	if strings.Contains(body, `id="scoped-thread-list"`) {
+		t.Fatal("N=0 /threads must not render list")
 	}
 }
 

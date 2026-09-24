@@ -295,7 +295,11 @@ func (s *Service) ServeThreads(c echo.Context) error {
 	artifactComp, artifactPage, artifactDoc := s.indexArtifactComponent(
 		c, artifactPath, hasArtifact,
 	)
-	chat := WorkbenchUnavailable("Pick a roster scope to see its threads.")
+	rows, listErr := s.freeformScopedConversationRows(c.Request().Context())
+	if listErr != nil {
+		return listErr
+	}
+	chat := renderScopedThreadListOrComposer(rows, "freeform", "", artifactPath)
 	chatTitle := "Threads"
 	chatOpen, commentsOpen := chatCommentsOpen(c.Request(), true)
 	artifactOpen := hasArtifact && workbench.ArtifactOpenFromRequest(c.Request())

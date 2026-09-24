@@ -13,7 +13,11 @@ import (
 	"testing"
 
 	"github.com/a-h/templ"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+
+	"github.com/CoreyCole/vamos/pkg/db"
+	servicedb "github.com/CoreyCole/vamos/server/services/db"
 )
 
 type threadWorkbenchTestRenderer struct {
@@ -243,17 +247,23 @@ func TestServeThreadsIndexOpensFreeformChat(t *testing.T) {
 	if r.chatThreadID != "" {
 		t.Fatalf("chat thread = %q", r.chatThreadID)
 	}
-	if strings.Contains(body, `id="agent-chat-composer"`) {
-		t.Fatal("pick-scope /threads must not render composer")
+	if !strings.Contains(body, `id="agent-chat-composer"`) {
+		t.Fatalf("N=0 /threads must render composer: %s", body)
+	}
+	if strings.Contains(body, `id="scoped-thread-list"`) {
+		t.Fatal("N=0 /threads must not render scoped list")
 	}
 	if strings.Contains(body, `data-testid="root-threads-index"`) {
-		t.Fatal("pick-scope /threads must not list freeform threads")
+		t.Fatal("/threads must not list via root-threads-index")
 	}
-	if !strings.Contains(body, "Pick a roster scope to see its threads.") {
-		t.Fatalf("missing pick-scope copy: %s", body)
+	if strings.Contains(body, `id="thread-chat"`) {
+		t.Fatal("GET /threads must not auto click-in")
 	}
-	if !strings.Contains(body, `href="/rooms/freeform"`) {
-		t.Fatalf("missing freeform navigator: %s", body)
+	if strings.Contains(body, "Pick a roster scope to see its threads.") {
+		t.Fatal("pick-scope copy must not appear on freeform home")
+	}
+	if strings.Contains(body, `href="/rooms/freeform"`) {
+		t.Fatal("roster must not expose Freeform row")
 	}
 	if !strings.Contains(body, `data-testid="mobile-toggle-threads"`) {
 		t.Fatalf("missing roster hamburger: %s", body)
@@ -275,10 +285,39 @@ func TestServeThreadsIndexOpensFreeformChat(t *testing.T) {
 
 func TestServeThreadsIndexListsRootThreads(t *testing.T) {
 	root := t.TempDir()
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "agents.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dbSvc.Close() })
+	threadID := uuid.NewString()
+	piID := uuid.NewString()
+	if _, err := dbSvc.Queries.CreateAgentThread(
+		context.Background(),
+		db.CreateAgentThreadParams{
+			ID:          threadID,
+			UserEmail:   "t@example.com",
+			Title:       "Empty kind",
+			Cwd:         filepath.Join(root, "freeform"),
+			LineageID:   uuid.NewString(),
+			PiSessionID: piID,
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	writeJSONLUserMessage(
+		t,
+		filepath.Join(root, "freeform", ".vamos", "sessions", "pi", piID+".jsonl"),
+		piID,
+	)
 	svc, err := NewService(root, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	svc.WithQueries(dbSvc.Queries)
 	r := &threadWorkbenchTestRenderer{}
 	svc.WithWorkbenchThreadRenderer(r)
 	rec := httptest.NewRecorder()
@@ -293,11 +332,17 @@ func TestServeThreadsIndexListsRootThreads(t *testing.T) {
 	if r.ensureFreeform {
 		t.Fatal("GET /threads must not ensure a freeform thread")
 	}
-	if strings.Contains(body, `data-testid="root-threads-index"`) {
-		t.Fatal("bare /threads must not render the freeform list")
+	for _, want := range []string{
+		`id="scoped-thread-list"`,
+		`id="agent-chat-composer"`,
+		`href="/threads/` + threadID + `"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("missing %q: %s", want, body)
+		}
 	}
-	if strings.Contains(body, `id="agent-chat-composer"`) {
-		t.Fatal("pick-scope must not open composer")
+	if strings.Contains(body, `data-testid="root-threads-index"`) {
+		t.Fatal("bare /threads must not render root-threads-index")
 	}
 }
 
