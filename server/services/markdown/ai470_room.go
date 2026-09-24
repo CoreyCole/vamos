@@ -182,6 +182,11 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		}
 	}
 
+	if kind == agenthome.KindPlan {
+		if rel := thoughtsCanonicalRel(planDoc); rel != "" {
+			sel.DirRel = rel
+		}
+	}
 	chatOpen, commentsOpen := chatCommentsOpen(c.Request(), chatOpen)
 	artifactOpen := hasArtifact || kind == agenthome.KindPlan
 	if viewport.IsDesktop() {
@@ -313,25 +318,22 @@ func (s *Service) liveRoster(
 ) agenthome.RosterView {
 	view := agenthome.RosterView{Selection: sel}
 	view.Docs = s.liveRosterDocs()
-	if s == nil || s.roster == nil {
-		view.Plans = s.liveRosterPlans(ctx)
-		return view
-	}
-	agents, err := s.roster.List()
-	if err != nil {
-		view.Plans = s.liveRosterPlans(ctx)
-		return view
-	}
-	for _, agent := range agents {
-		preview := lastBotHomePreview(ctx, s.queries, s.basePath, agent.Slug)
-		view.Bots = append(view.Bots, agenthome.RosterBotRow{
-			Slug:    agent.Slug,
-			Title:   agenthome.RosterBotTitle(agent.Name, agent.Slug),
-			Preview: preview.Text,
-			Time:    rosterPlanTime(preview.Time),
-		})
-	}
 	view.Plans = s.liveRosterPlans(ctx)
+	if s != nil && s.roster != nil {
+		agents, err := s.roster.List()
+		if err == nil {
+			for _, agent := range agents {
+				preview := lastBotHomePreview(ctx, s.queries, s.basePath, agent.Slug)
+				view.Bots = append(view.Bots, agenthome.RosterBotRow{
+					Slug:    agent.Slug,
+					Title:   agenthome.RosterBotTitle(agent.Name, agent.Slug),
+					Preview: preview.Text,
+					Time:    rosterPlanTime(preview.Time),
+				})
+			}
+		}
+	}
+	view.Selection = agenthome.RefinePlanRosterSelection(view.Selection, view.Plans)
 	return view
 }
 
@@ -368,7 +370,11 @@ func (s *Service) rosterSelectionForLiveThread(
 		if id == "" {
 			return agenthome.RosterSelection{}
 		}
-		return agenthome.RosterSelection{Kind: agenthome.KindPlan, ID: id}
+		return agenthome.RosterSelection{
+			Kind:   agenthome.KindPlan,
+			ID:     id,
+			DirRel: thoughtsCanonicalRel(rel),
+		}
 	case "pairwise":
 		return s.pairwiseRosterSelection(ctx, thread)
 	default:

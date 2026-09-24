@@ -985,6 +985,95 @@ func TestLiveRosterListsPlanDirsFromIndex(t *testing.T) {
 	}
 }
 
+func TestLiveRosterNestedPlanDirsSelectOneRow(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	parentRel := "CoreyCole/plans/2026-09-21_19-33-37_equitrust-2026-run-rate-met"
+	reviewRel := parentRel + "/reviews/2026-09-22_13-33-24_full-code-review"
+	mustMkdirAll(t, filepath.Join(root, filepath.FromSlash(parentRel)))
+	mustMkdirAll(t, filepath.Join(root, filepath.FromSlash(reviewRel)))
+	mustWriteFile(
+		t,
+		filepath.Join(root, filepath.FromSlash(parentRel), "design.md"),
+		[]byte("# p\n"),
+	)
+	mustWriteFile(
+		t,
+		filepath.Join(root, filepath.FromSlash(reviewRel), "plan.md"),
+		[]byte("# r\n"),
+	)
+
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "nested-plans.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dbSvc.Close() })
+	ctx := context.Background()
+	stamp := time.Date(2026, 9, 21, 19, 33, 37, 0, time.Local)
+	if _, err := dbSvc.Queries.UpsertDiscoveredPlanWorkspace(
+		ctx,
+		db.UpsertDiscoveredPlanWorkspaceParams{
+			PlanDirRel:        parentRel,
+			ProjectID:         "vamos",
+			PlanDir:           "thoughts/" + parentRel,
+			Label:             "equitrust 2026 run rate met",
+			ArtifactUpdatedAt: stamp,
+			QrspiLifecycle:    "implement",
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := dbSvc.Queries.UpsertDiscoveredPlanWorkspace(
+		ctx,
+		db.UpsertDiscoveredPlanWorkspaceParams{
+			PlanDirRel:        reviewRel,
+			ProjectID:         "vamos",
+			PlanDir:           "thoughts/" + reviewRel,
+			Label:             "full code review",
+			ArtifactUpdatedAt: stamp,
+			QrspiLifecycle:    "review_plan",
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithQueries(dbSvc.Queries)
+
+	view := svc.liveRoster(ctx, agenthome.RosterSelection{
+		Kind:   agenthome.KindPlan,
+		ID:     "2026-09-21_19-33-37_equitrust-2026-run-rate-met",
+		DirRel: parentRel + "/eric-comparison/comparison-report",
+	})
+	if len(view.Plans) != 2 {
+		t.Fatalf("plans = %#v", view.Plans)
+	}
+	if view.Plans[0].ID == view.Plans[1].ID {
+		t.Fatalf("nested roster ids collided: %#v", view.Plans)
+	}
+	var buf bytes.Buffer
+	if err := agenthome.RosterRail(view).Render(ctx, &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	selected := strings.Count(html, "roster-row-selected")
+	if selected != 1 {
+		t.Fatalf("selected rows = %d, want 1\n%s", selected, html)
+	}
+	if strings.Count(
+		html,
+		`id="roster-row-plan-2026-09-21_19-33-37_equitrust-2026-run-rate-met"`,
+	) != 1 {
+		t.Fatalf("duplicate parent roster row id:\n%s", html)
+	}
+}
+
 func TestLiveRosterPlansEmptyIndexHasNoAlpha(t *testing.T) {
 	t.Parallel()
 	svc, err := NewService(t.TempDir(), nil, nil)

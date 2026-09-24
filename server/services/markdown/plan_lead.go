@@ -97,7 +97,11 @@ func (s *Service) rosterSelectionForThoughtsDoc(
 	if roomID == "" {
 		return agenthome.RosterSelection{}
 	}
-	return agenthome.RosterSelection{Kind: agenthome.KindPlan, ID: roomID}
+	return agenthome.RosterSelection{
+		Kind:   agenthome.KindPlan,
+		ID:     roomID,
+		DirRel: thoughtsCanonicalRel(docPath),
+	}
 }
 
 func thoughtsAgentsRoomID(agentsRoot string) string {
@@ -286,16 +290,31 @@ func (s *Service) rosterPlanRowFromDirRel(
 	rel = strings.Trim(rel, "/")
 	rel = strings.TrimPrefix(rel, "thoughts/")
 	doc := s.thoughtsPlanArtifactPath(rel)
-	id := planLeadRoomID(doc)
-	if id == "" {
-		id = filepath.Base(rel)
-	}
 	return agenthome.RosterPlanRow{
-		ID:    id,
-		Title: rosterPlanTitle(label, rel),
-		Href:  planLeadChatHref(doc),
-		Time:  rosterPlanTime(updatedAt),
+		ID:     rosterPlanRowID(rel),
+		Title:  rosterPlanTitle(label, rel),
+		Href:   planLeadChatHref(doc),
+		Time:   rosterPlanTime(updatedAt),
+		DirRel: rel,
 	}
+}
+
+func rosterPlanRowID(planDirRel string) string {
+	rel := filepath.ToSlash(strings.TrimSpace(planDirRel))
+	rel = strings.Trim(rel, "/")
+	rel = strings.TrimPrefix(rel, "thoughts/")
+	if rel == "" || rel == "." {
+		return ""
+	}
+	id := planLeadRoomID("thoughts/" + rel)
+	if id == "" {
+		return filepath.Base(rel)
+	}
+	parts := strings.Split(rel, "/")
+	if len(parts) == 3 && parts[0] != "" && parts[1] == "plans" && parts[2] == id {
+		return id
+	}
+	return strings.ReplaceAll(rel, "/", "--")
 }
 
 func (s *Service) liveRosterDocs() []agenthome.RosterDocRow {

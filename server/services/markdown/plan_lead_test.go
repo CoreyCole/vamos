@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/CoreyCole/vamos/server/services/agenthome"
 )
@@ -17,6 +18,52 @@ func TestRosterDocsBandSelectedDocsDeskRoomID(t *testing.T) {
 	}
 	if agenthome.RosterDocsBandSelected(sel, "chestnut") {
 		t.Fatal("docs--vamos must not select chestnut")
+	}
+}
+
+func TestRosterPlanRowIDNestedUnique(t *testing.T) {
+	t.Parallel()
+	parent := rosterPlanRowID(
+		"thoughts/CoreyCole/plans/2026-09-21_19-33-37_equitrust-2026-run-rate-met",
+	)
+	nested := rosterPlanRowID(
+		"thoughts/CoreyCole/plans/2026-09-21_19-33-37_equitrust-2026-run-rate-met/reviews/full-code-review",
+	)
+	if parent != "2026-09-21_19-33-37_equitrust-2026-run-rate-met" {
+		t.Fatalf("parent id = %q", parent)
+	}
+	if nested == parent || nested == "" {
+		t.Fatalf("nested id = %q, must be unique", nested)
+	}
+	if got := rosterPlanRowID("owner/plans/alpha"); got != "alpha" {
+		t.Fatalf("top-level id = %q", got)
+	}
+}
+
+func TestRosterPlanRowFromDirRelNestedUniqueID(t *testing.T) {
+	t.Parallel()
+	svc := &Service{}
+	parent := svc.rosterPlanRowFromDirRel(
+		"thoughts/owner/plans/alpha",
+		time.Time{},
+		"alpha",
+	)
+	nested := svc.rosterPlanRowFromDirRel(
+		"thoughts/owner/plans/alpha/reviews/full-code-review",
+		time.Time{},
+		"full code review",
+	)
+	if parent.ID != "alpha" {
+		t.Fatalf("parent id = %q", parent.ID)
+	}
+	if parent.DirRel != "owner/plans/alpha" {
+		t.Fatalf("parent DirRel = %q", parent.DirRel)
+	}
+	if nested.ID == parent.ID || nested.ID == "" {
+		t.Fatalf("nested id = %q shares parent", nested.ID)
+	}
+	if nested.DirRel != "owner/plans/alpha/reviews/full-code-review" {
+		t.Fatalf("nested DirRel = %q", nested.DirRel)
 	}
 }
 

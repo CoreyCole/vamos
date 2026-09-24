@@ -10,8 +10,9 @@ import (
 
 // RosterSelection marks the SSR-selected roster row.
 type RosterSelection struct {
-	Kind RoomKind
-	ID   string
+	Kind   RoomKind
+	ID     string
+	DirRel string
 }
 
 // RosterBotRow is one live agent in the Bots band.
@@ -24,10 +25,11 @@ type RosterBotRow struct {
 
 // RosterPlanRow is one live plan dir in the Plan band.
 type RosterPlanRow struct {
-	ID    string
-	Title string
-	Href  string
-	Time  string // shown above title (Corey feel); empty omits
+	ID     string
+	Title  string
+	Href   string
+	Time   string // shown above title (Corey feel); empty omits
+	DirRel string
 }
 
 // RosterDocRow is one thoughts/docs/{product}/ desk in the Docs band.
