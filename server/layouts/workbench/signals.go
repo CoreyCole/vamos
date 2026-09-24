@@ -122,6 +122,19 @@ func regionPrimaryVisible(state WorkbenchState) bool {
 	return false
 }
 
+func regionChatOrCommentsVisible(state WorkbenchState) bool {
+	for _, r := range state.Regions {
+		if !r.Visible {
+			continue
+		}
+		switch r.ID {
+		case WorkbenchV2ChatRegionID, WorkbenchV2CommentsRegionID:
+			return true
+		}
+	}
+	return false
+}
+
 func RegionSSRFlexStyle(state WorkbenchState, region WorkbenchRegion) string {
 	if !region.Visible || state.ViewportClass == ViewportMobile {
 		return ""
@@ -130,6 +143,9 @@ func RegionSSRFlexStyle(state WorkbenchState, region WorkbenchRegion) string {
 	case WorkbenchV2ChatRegionID:
 		return "flex: 1 1 0%"
 	case WorkbenchV2ArtifactRegionID:
+		if !regionChatOrCommentsVisible(state) {
+			return "flex: 1 1 0%"
+		}
 		if region.Ratio <= 0 {
 			return ""
 		}
@@ -199,6 +215,13 @@ func RegionAriaHidden(region WorkbenchRegion) string {
 
 func FloatAttr(value float64) string {
 	return strconv.FormatFloat(value, 'f', -1, 64)
+}
+
+func boolAttr(v bool) string {
+	if v {
+		return "true"
+	}
+	return "false"
 }
 
 func CanResizeAfter(state WorkbenchState, index int) bool {

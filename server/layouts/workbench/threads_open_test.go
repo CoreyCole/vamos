@@ -26,6 +26,18 @@ func TestThreadsOpenFromRequest(t *testing.T) {
 	}
 }
 
+func TestThreadsOpenFromRequestDefaultClosed(t *testing.T) {
+	t.Parallel()
+	req := &http.Request{Header: http.Header{}}
+	if ThreadsOpenFromRequestDefault(req, false) {
+		t.Fatal("missing cookie should honor default closed")
+	}
+	req.AddCookie(&http.Cookie{Name: ThreadsOpenCookie, Value: "1"})
+	if !ThreadsOpenFromRequestDefault(req, false) {
+		t.Fatal("cookie 1 should open even when default closed")
+	}
+}
+
 func TestThreadsToggleClickActionsWriteCookieNotLayoutSave(t *testing.T) {
 	t.Parallel()
 

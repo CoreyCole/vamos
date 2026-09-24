@@ -874,6 +874,9 @@ func (s *Service) thoughtsArtifactPane(
 	browser = remapThreadArtifactBrowserForThoughts(browser, selectedDoc)
 	browser.ShowCloseDetails = false
 	applyWorkbenchPathHeaderThreadsReopen(c, &browser)
+	if c != nil {
+		browser.ThreadsOpen = workbench.ThreadsOpenFromRequestDefault(c.Request(), false)
+	}
 	setViewDocumentToggle(&browser, true, chatHref)
 	browser.HeaderActions = BuildThreadArtifactHeaderActionsWithBase(
 		page,

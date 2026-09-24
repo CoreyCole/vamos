@@ -29,6 +29,18 @@ func TestChatOpenFromRequest(t *testing.T) {
 	}
 }
 
+func TestChatOpenFromRequestDefaultClosed(t *testing.T) {
+	t.Parallel()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	if ChatOpenFromRequestDefault(req, false) {
+		t.Fatal("missing cookie should honor default closed")
+	}
+	req.AddCookie(&http.Cookie{Name: ChatOpenCookie, Value: "1"})
+	if !ChatOpenFromRequestDefault(req, false) {
+		t.Fatal("cookie=1 should open even when default closed")
+	}
+}
+
 func TestChatToggleClickActionWritesChatCookieBothWays(t *testing.T) {
 	t.Parallel()
 	js := ChatToggleClickAction()

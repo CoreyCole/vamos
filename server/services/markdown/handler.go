@@ -478,7 +478,7 @@ func (s *Service) buildThoughtsV2WorkbenchState(
 	if err != nil {
 		return workbench.WorkbenchState{}, err
 	}
-	chatOpen, commentsOpen := chatCommentsOpen(c.Request(), true)
+	threadsOpen, chatOpen, commentsOpen := thoughtsChromeOpen(c.Request())
 	return workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     pageArgs.UserEmail,
 		ViewportClass: viewport,
@@ -492,7 +492,7 @@ func (s *Service) buildThoughtsV2WorkbenchState(
 		Chat:         chat,
 		Artifact:     artifact,
 		Comments:     comments,
-		ThreadsOpen:  workbench.ThreadsOpenFromRequest(c.Request()),
+		ThreadsOpen:  threadsOpen,
 		ChatOpen:     chatOpen,
 		ArtifactOpen: workbench.ArtifactOpenFromRequest(c.Request()),
 		CommentsOpen: commentsOpen,
@@ -648,7 +648,7 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 	if err != nil {
 		return workbench.WorkbenchState{}, err
 	}
-	chatOpen, commentsOpen := chatCommentsOpen(c.Request(), true)
+	threadsOpen, chatOpen, commentsOpen := thoughtsChromeOpen(c.Request())
 	return workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     args.UserEmail,
 		ViewportClass: viewport,
@@ -662,7 +662,7 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 		Chat:         chat,
 		Artifact:     artifact,
 		Comments:     EmptyDirectoryContextPanel(),
-		ThreadsOpen:  workbench.ThreadsOpenFromRequest(c.Request()),
+		ThreadsOpen:  threadsOpen,
 		ChatOpen:     chatOpen,
 		ArtifactOpen: workbench.ArtifactOpenFromRequest(c.Request()),
 		CommentsOpen: commentsOpen,

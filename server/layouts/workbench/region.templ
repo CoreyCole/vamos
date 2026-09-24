@@ -5,7 +5,7 @@ templ Region(state WorkbenchState, region WorkbenchRegion) {
 		id={ region.TargetID }
 		data-workbench-region={ region.ID }
 		data-workbench-signal={ SignalKey(region) }
-		data-workbench-visible?={ region.Visible }
+		data-workbench-visible={ boolAttr(region.Visible) }
 		data-attr:data-workbench-visible={ "$workbench.regions." + SignalKey(region) + ".visible ? 'true' : 'false'" }
 		data-workbench-ratio={ FloatAttr(region.Ratio) }
 		data-workbench-min-rem={ FloatAttr(region.MinRem) }

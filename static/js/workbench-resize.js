@@ -16,10 +16,13 @@ function allRegions(root) {
 }
 
 function isVisible(region) {
+  // Display wins. A stale data-workbench-visible="true" on display:none
+  // used to keep chat in the ratio pass and freeze the doc at (1 - chat).
+  if (window.getComputedStyle(region).display === "none") return false;
   const flag = region.getAttribute("data-workbench-visible");
-  if (flag === "true") return true;
-  if (flag === "false") return false;
-  return window.getComputedStyle(region).display !== "none";
+  if (flag === "false" || flag === "0") return false;
+  if (flag === "true" || flag === "1") return true;
+  return true;
 }
 
 function applyRegionVisible(regionID, visible) {
@@ -31,6 +34,11 @@ function applyRegionVisible(regionID, visible) {
   region.classList.toggle("hidden", !visible);
   region.classList.toggle("md:!hidden", !visible);
   region.classList.toggle("md:!flex", visible);
+  if (!visible) {
+    region.style.removeProperty("flex");
+    region.style.removeProperty("width");
+    delete region.dataset.workbenchWidthPx;
+  }
 }
 
 window.workbenchApplyRegionVisible = applyRegionVisible;
@@ -520,11 +528,18 @@ function reflowVisibleRegionFlex(root) {
   }
   const regions = visibleRegions(root);
   const hasPrimary = regions.some((region) => regionSlot(region) === "primary");
+  const hasChat =
+    regions.some((region) => region.id === "workbench-v2-chat") ||
+    regions.some((region) => region.id === "workbench-v2-comments");
   const growTarget = hasPrimary ? null : regions[regions.length - 1];
   for (const region of regions) {
     const slot = regionSlot(region);
     const ratio = Number(region.dataset.workbenchRatio || 0);
-    if (slot === "primary" || region === growTarget) {
+    if (
+      slot === "primary" ||
+      region === growTarget ||
+      (region.id === "workbench-v2-artifact" && !hasChat)
+    ) {
       region.style.flex = "1 1 0%";
     } else if (ratio > 0) {
       region.style.flex = "0 0 " + (ratio * 100).toFixed(2) + "%";

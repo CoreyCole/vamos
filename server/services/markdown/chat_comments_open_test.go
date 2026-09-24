@@ -45,3 +45,31 @@ func TestChatCommentsOpenHonorsChatCookie(t *testing.T) {
 		t.Fatal("routeChatOpen false must keep chat closed")
 	}
 }
+
+func TestThoughtsChromeOpenDefaultsClosed(t *testing.T) {
+	t.Parallel()
+
+	req := httptest.NewRequest(http.MethodGet, "/thoughts/docs/x.md", nil)
+	threadsOpen, chatOpen, commentsOpen := thoughtsChromeOpen(req)
+	if threadsOpen || chatOpen || commentsOpen {
+		t.Fatalf(
+			"thoughts default: threads=%v chat=%v comments=%v",
+			threadsOpen,
+			chatOpen,
+			commentsOpen,
+		)
+	}
+
+	reqOpen := httptest.NewRequest(http.MethodGet, "/thoughts/docs/x.md", nil)
+	reqOpen.AddCookie(&http.Cookie{Name: workbench.ChatOpenCookie, Value: "1"})
+	reqOpen.AddCookie(&http.Cookie{Name: workbench.ThreadsOpenCookie, Value: "1"})
+	threadsOpen, chatOpen, commentsOpen = thoughtsChromeOpen(reqOpen)
+	if !threadsOpen || !chatOpen || commentsOpen {
+		t.Fatalf(
+			"cookie=1: threads=%v chat=%v comments=%v",
+			threadsOpen,
+			chatOpen,
+			commentsOpen,
+		)
+	}
+}

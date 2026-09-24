@@ -11,12 +11,17 @@ const ThreadsOpenCookie = "wb2_threads_open"
 
 // ThreadsOpenFromRequest reads wb2_threads_open; missing/invalid => open.
 func ThreadsOpenFromRequest(r *http.Request) bool {
+	return ThreadsOpenFromRequestDefault(r, true)
+}
+
+// ThreadsOpenFromRequestDefault reads wb2_threads_open; missing/invalid => defaultOpen.
+func ThreadsOpenFromRequestDefault(r *http.Request, defaultOpen bool) bool {
 	if r == nil {
-		return true
+		return defaultOpen
 	}
 	c, err := r.Cookie(ThreadsOpenCookie)
 	if err != nil || (c.Value != "0" && c.Value != "1") {
-		return true
+		return defaultOpen
 	}
 	return c.Value == "1"
 }

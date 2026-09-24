@@ -21,6 +21,14 @@ func chatCommentsOpen(r *http.Request, routeChatOpen bool) (chatOpen, commentsOp
 	return chatOpen, commentsOpen
 }
 
+// thoughtsChromeOpen defaults roster + chat closed on /thoughts. Cookie 1 only.
+func thoughtsChromeOpen(r *http.Request) (threadsOpen, chatOpen, commentsOpen bool) {
+	commentsOpen = workbench.CommentsOpenFromRequest(r)
+	chatOpen = workbench.ChatOpenFromRequestDefault(r, false) && !commentsOpen
+	threadsOpen = workbench.ThreadsOpenFromRequestDefault(r, false)
+	return threadsOpen, chatOpen, commentsOpen
+}
+
 const thoughtsSharedThreadUnavailable = "No shared thread mapped for this document yet."
 
 func thoughtsEnsureDocPath(docPath string) string {
@@ -48,7 +56,7 @@ func (s *Service) thoughtsWorkbenchChatColumn(
 	pageArgs *PageArgs,
 ) (templ.Component, error) {
 	_ = userEmail
-	threadsOpen := workbench.ThreadsOpenFromRequest(c.Request())
+	threadsOpen := workbench.ThreadsOpenFromRequestDefault(c.Request(), false)
 	title := "Chat"
 	if id := planLeadRoomID(docPath); id != "" {
 		if h := workbench.HumanizePlanRoomID(id); h != "" {

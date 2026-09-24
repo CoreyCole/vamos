@@ -9,12 +9,17 @@ const ChatOpenCookie = "wb2_chat_open"
 
 // ChatOpenFromRequest reads wb2_chat_open; missing/invalid => open.
 func ChatOpenFromRequest(r *http.Request) bool {
+	return ChatOpenFromRequestDefault(r, true)
+}
+
+// ChatOpenFromRequestDefault reads wb2_chat_open; missing/invalid => defaultOpen.
+func ChatOpenFromRequestDefault(r *http.Request, defaultOpen bool) bool {
 	if r == nil {
-		return true
+		return defaultOpen
 	}
 	c, err := r.Cookie(ChatOpenCookie)
 	if err != nil || (c.Value != "0" && c.Value != "1") {
-		return true
+		return defaultOpen
 	}
 	return c.Value == "1"
 }

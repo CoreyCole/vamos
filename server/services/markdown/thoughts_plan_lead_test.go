@@ -194,6 +194,57 @@ func TestThoughtsDocUnresolvedThreadUsesUnavailableNotEmptyRegion(t *testing.T) 
 	}
 }
 
+func TestThoughtsDocDefaultsChatAndHamburgerHidden(t *testing.T) {
+	root := t.TempDir()
+	mustMkdirAll(t, filepath.Join(root, "docs", "vamos"))
+	mustWriteFile(
+		t,
+		filepath.Join(root, "docs", "vamos", "index.html"),
+		[]byte("<html></html>"),
+	)
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{ensureID: "thread-docs"})
+
+	e := echo.New()
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/thoughts/docs/vamos/index.html",
+		nil,
+	)
+	c := e.NewContext(req, httptest.NewRecorder())
+	page := &PageArgs{
+		FilePath:  "docs/vamos/index.html",
+		UserEmail: "t@example.com",
+	}
+	state, err := svc.buildThoughtsV2WorkbenchState(c, page)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var chatVisible, threadsVisible, artifactVisible bool
+	for _, region := range state.Regions {
+		switch region.ID {
+		case workbench.WorkbenchV2ChatRegionID:
+			chatVisible = region.Visible
+		case workbench.WorkbenchV2ThreadsRegionID:
+			threadsVisible = region.Visible
+		case workbench.WorkbenchV2ArtifactRegionID:
+			artifactVisible = region.Visible
+		}
+	}
+	if chatVisible {
+		t.Fatal("thoughts chat must default hidden")
+	}
+	if threadsVisible {
+		t.Fatal("thoughts hamburger/roster must default hidden")
+	}
+	if !artifactVisible {
+		t.Fatal("thoughts document must stay visible")
+	}
+}
+
 func TestThoughtsDocHonorsChatOpenCookieZero(t *testing.T) {
 	root := t.TempDir()
 	mustMkdirAll(t, filepath.Join(root, "docs", "vamos"))
