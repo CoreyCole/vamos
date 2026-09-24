@@ -58,12 +58,13 @@ func TestArtifactHideShowActionsWriteCookie(t *testing.T) {
 			t.Fatalf("show missing %q in %s", want, show)
 		}
 	}
-	for _, action := range []string{hide, show, toggle} {
-		if strings.Contains(action, "workbenchReflow()") {
-			t.Fatalf("must not pixel-lock via workbenchReflow: %s", action)
-		}
-		if strings.Contains(action, "workbenchApplyRegionVisible") {
-			t.Fatalf("must not applyRegionVisible on details: %s", action)
+	for _, action := range []string{hide, show} {
+		if !strings.Contains(
+			action,
+			"workbenchApplyRegionVisible('workbench-v2-artifact'",
+		) ||
+			!strings.Contains(action, "workbenchReflow()") {
+			t.Fatalf("details toggle must paint then reflow: %s", action)
 		}
 	}
 	if !strings.Contains(toggle, "visible === false") {

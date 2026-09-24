@@ -115,6 +115,28 @@ function regionSlot(region) {
   return region.dataset.workbenchSlot || "";
 }
 
+function regionID(region) {
+  return region.dataset.workbenchRegion || region.id || "";
+}
+
+function isChatColumn(region) {
+  const id = regionID(region);
+  return id === "workbench-v2-chat" || id === "workbench-v2-comments";
+}
+
+function isArtifactColumn(region) {
+  return regionID(region) === "workbench-v2-artifact";
+}
+
+// Chat is the grower (matches RegionSSRFlexStyle). Artifact is a sidecar.
+function layoutGrower(regions) {
+  return (
+    regions.find(isChatColumn) ||
+    regions.find(isArtifactColumn) ||
+    regions[regions.length - 1]
+  );
+}
+
 function resizeGroupForHandle(root, before, after) {
   const visible = visibleRegions(root);
   const navigation = [before, after].find(
@@ -204,34 +226,13 @@ function applyRegionRatios(root) {
     return;
   }
 
-  const primary = regions.find((region) => regionSlot(region) === "primary");
-  if (!primary) {
-    if (regions.length === 0) return;
-    let used = 0;
-    for (let i = 0; i < regions.length - 1; i++) {
-      const region = regions[i];
-      const lastMin = regionMinWidth(regions[regions.length - 1]);
-      const ratio = Number(region.dataset.workbenchRatio || 0);
-      const width = clampRegionWidth(
-        region,
-        ratio * availableWidth,
-        availableWidth,
-        lastMin,
-      );
-      region.dataset.workbenchWidthPx = width.toFixed(2);
-      setRegionWidth(region, width);
-      used += width;
-    }
-    const last = regions[regions.length - 1];
-    const lastWidth = Math.max(regionMinWidth(last), availableWidth - used);
-    last.dataset.workbenchWidthPx = lastWidth.toFixed(2);
-    setRegionWidth(last, lastWidth);
-    return;
-  }
+  if (regions.length === 0) return;
+  const grower = layoutGrower(regions);
+  if (!grower) return;
 
-  const primaryMin = regionMinWidth(primary);
-  const fixedRegions = regions.filter((region) => region !== primary);
-  let reservedForOthers = primaryMin;
+  const growerMin = regionMinWidth(grower);
+  const fixedRegions = regions.filter((region) => region !== grower);
+  let reservedForOthers = growerMin;
   let fixedWidth = 0;
   const widths = new Map();
   for (const region of fixedRegions) {
@@ -250,8 +251,8 @@ function applyRegionRatios(root) {
     widths.set(region, width);
     fixedWidth += width;
   }
-  if (fixedWidth > availableWidth - primaryMin) {
-    let overflow = fixedWidth - (availableWidth - primaryMin);
+  if (fixedWidth > availableWidth - growerMin) {
+    let overflow = fixedWidth - (availableWidth - growerMin);
     for (const region of [...fixedRegions].reverse()) {
       if (overflow <= 0) break;
       const min = regionMinWidth(region);
@@ -268,7 +269,7 @@ function applyRegionRatios(root) {
     region.dataset.workbenchWidthPx = width.toFixed(2);
     setRegionWidth(region, width);
   }
-  setRegionWidth(primary, Math.max(primaryMin, availableWidth - fixedWidth));
+  setRegionWidth(grower, Math.max(growerMin, availableWidth - fixedWidth));
 }
 
 function updateHandles(root) {
@@ -428,31 +429,23 @@ function startResize(event) {
     const dx = moveEvent.clientX - startX;
     // AI-470: never auto-close from gutter drag (steals pointer onto reopen).
     // Min-width clamp below only — explicit Threads toggle owns visibility/cookie.
-    const beforeIsPrimary = regionSlot(before) === "primary";
-    const afterIsPrimary = regionSlot(after) === "primary";
-
-    if (beforeIsPrimary && !afterIsPrimary) {
-      const nextAfter = clampRegionWidth(
-        after,
-        afterStart - dx,
+    const sidecar = isArtifactColumn(before)
+      ? before
+      : isArtifactColumn(after)
+        ? after
+        : null;
+    if (sidecar) {
+      const sidecarStart = sidecar === before ? beforeStart : afterStart;
+      const nextSidecar = clampRegionWidth(
+        sidecar,
+        sidecar === before ? sidecarStart + dx : sidecarStart - dx,
         availableWidth,
-        regionMinWidth(before),
+        regionMinWidth(sidecar === before ? after : before),
       );
-      after.dataset.workbenchRatio = (nextAfter / availableWidth).toFixed(4);
-      after.dataset.workbenchWidthPx = nextAfter.toFixed(2);
-      applyRegionRatios(root);
-      return;
-    }
-
-    if (!beforeIsPrimary && afterIsPrimary) {
-      const nextBefore = clampRegionWidth(
-        before,
-        beforeStart + dx,
-        availableWidth,
-        regionMinWidth(after),
+      sidecar.dataset.workbenchRatio = (nextSidecar / availableWidth).toFixed(
+        4,
       );
-      before.dataset.workbenchRatio = (nextBefore / availableWidth).toFixed(4);
-      before.dataset.workbenchWidthPx = nextBefore.toFixed(2);
+      sidecar.dataset.workbenchWidthPx = nextSidecar.toFixed(2);
       applyRegionRatios(root);
       return;
     }
@@ -527,19 +520,10 @@ function reflowVisibleRegionFlex(root) {
     return;
   }
   const regions = visibleRegions(root);
-  const hasPrimary = regions.some((region) => regionSlot(region) === "primary");
-  const hasChat =
-    regions.some((region) => region.id === "workbench-v2-chat") ||
-    regions.some((region) => region.id === "workbench-v2-comments");
-  const growTarget = hasPrimary ? null : regions[regions.length - 1];
+  const grower = layoutGrower(regions);
   for (const region of regions) {
-    const slot = regionSlot(region);
     const ratio = Number(region.dataset.workbenchRatio || 0);
-    if (
-      slot === "primary" ||
-      region === growTarget ||
-      (region.id === "workbench-v2-artifact" && !hasChat)
-    ) {
+    if (region === grower) {
       region.style.flex = "1 1 0%";
     } else if (ratio > 0) {
       region.style.flex = "0 0 " + (ratio * 100).toFixed(2) + "%";

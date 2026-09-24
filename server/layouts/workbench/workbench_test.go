@@ -641,6 +641,7 @@ func TestWorkbenchResizeJSShowsHandlesForVisibleAdjacentRegions(t *testing.T) {
 		"function shareChatCommentsRatio(root)",
 		"never auto-close from gutter drag",
 		`getComputedStyle(region).display === "none"`,
+		"function layoutGrower(regions)",
 	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("workbench-resize.js missing %q in %s", want, js)
@@ -2135,7 +2136,7 @@ func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 	for _, fragment := range []string{
 		`data-workbench-region="workbench-v2-chat"`,
 		`data-workbench-min-rem="18"`,
-		`/js/workbench-resize.js?v=20`,
+		`/js/workbench-resize.js?v=21`,
 		`/js/workbench-history.js?v=23`,
 	} {
 		if !strings.Contains(html, fragment) {

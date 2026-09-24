@@ -53,11 +53,12 @@ func artifactOpenCookieWriteJS(open bool) string {
 }
 
 // ArtifactHideClickAction collapses the artifact pane and persists via cookie.
-// Hide via signal + cookie + layout reflow (roster path). Chat stays the grower.
-// Do not call workbenchApplyRegionVisible or workbenchReflow().
+// Apply DOM visibility before reflow so chat fills without waiting on Datastar.
 func ArtifactHideClickAction() string {
 	return "$workbench.regions.workbenchV2Artifact.visible = false; " +
 		artifactOpenCookieWriteJS(false) + "; " +
+		"if (window.workbenchApplyRegionVisible) { workbenchApplyRegionVisible('workbench-v2-artifact', false) }; " +
+		"if (window.workbenchReflow) { workbenchReflow() }; " +
 		threadsLayoutReflowJS()
 }
 
@@ -65,6 +66,8 @@ func ArtifactHideClickAction() string {
 func ArtifactShowClickAction() string {
 	return "$workbench.regions.workbenchV2Artifact.visible = true; " +
 		artifactOpenCookieWriteJS(true) + "; " +
+		"if (window.workbenchApplyRegionVisible) { workbenchApplyRegionVisible('workbench-v2-artifact', true) }; " +
+		"if (window.workbenchReflow) { workbenchReflow() }; " +
 		threadsLayoutReflowJS()
 }
 

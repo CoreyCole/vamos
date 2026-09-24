@@ -22,7 +22,8 @@ func TestWorkbenchResizeReflowsVisibleColumnsOnThreadsToggle(t *testing.T) {
 		`document.addEventListener("workbench-layout-reflow", reflowWorkbenchFromEvent)`,
 		`region.style.flex = "0 0 " + (ratio * 100).toFixed(2) + "%"`,
 		"Number(region.dataset.workbenchRatio || 0) * availableWidth",
-		`region.id === "workbench-v2-artifact" && !hasChat`,
+		"function layoutGrower(regions)",
+		"regions.find(isChatColumn)",
 	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("threads toggle reflow missing %q", want)
@@ -84,7 +85,7 @@ func TestWorkbenchV2ThreadsHasIndependentHideAndReopenControls(t *testing.T) {
 		`aria-label="Roster sidebar (Ctrl+B)"`,
 		`$workbench.regions.workbenchV2Threads.visible === false`,
 		`wb2_threads_open=1`,
-		`/js/workbench-resize.js?v=20`,
+		`/js/workbench-resize.js?v=21`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("workbench threads reopen control missing %q", want)
