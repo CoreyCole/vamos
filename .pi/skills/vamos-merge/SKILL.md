@@ -1,6 +1,6 @@
 ---
 name: vamos-merge
-description: Land completed Vamos and paired DatastarUI work, refresh Vamos copied UI source, update local stage/main checkouts, then rebuild both dogfood lanes. Use for /vamos-merge, merging Vamos work, syncing local baselines, or rebuilding stage and main.
+description: Land Vamos and paired DatastarUI work, sync origin and local baselines, then rebuild, restart, and verify both dogfood lanes. Use for /vamos-merge, requests to merge into vamos-main or origin, or deploying stage and main.
 ---
 
 # Vamos Merge
@@ -13,13 +13,17 @@ Keep DatastarUI and the local stage/main pairs current, built, and running:
 | Stage | thoughts repo | `../vamos` |
 | Main | main thoughts baseline | `../vamos-main` |
 
-Run from the canonical `../vamos` checkout. Resolve host-owned paths and URLs from the deployment configuration or operator input; do not infer repository names, service names, ports, or domains.
+Run from the canonical `../vamos` checkout. Resolve host-owned paths, URLs, and restart commands from deployment config or operator input.
+
+**A runtime merge includes deployment.** Requests to merge into `../vamos-main` or push `origin/main` also require the main rebuild and restart. Stop after source sync only when the user explicitly requests source-only work or defers deployment.
 
 ```bash
 : "${VAMOS_THOUGHTS_REPO_CHECKOUT:?set the working thoughts repo checkout}"
 : "${VAMOS_MAIN_THOUGHTS_REPO_CHECKOUT:?set its clean main baseline checkout}"
 : "${VAMOS_STAGE_URL:?set the stage health-check URL}"
 : "${VAMOS_MAIN_URL:?set the main health-check URL}"
+: "${VAMOS_STAGE_RESTART_CMD:?set the host-owned stage restart command}"
+: "${VAMOS_MAIN_RESTART_CMD:?set the host-owned main restart command}"
 thoughts_repo=$VAMOS_THOUGHTS_REPO_CHECKOUT
 main_thoughts_repo=$VAMOS_MAIN_THOUGHTS_REPO_CHECKOUT
 ```
@@ -35,6 +39,9 @@ Keep these variables for the workflow. In the current dogfood setup, `cn-agents`
 - Preserve feature commits in Vamos and DatastarUI. Fast-forward only; do not squash, cherry-pick, or create merge commits.
 - Update `pkg/datastarui` through the DatastarUI CLI; do not hand-copy or hand-customize copied components.
 - Stop on conflicts, non-fast-forward updates, build failures, restart failures, or failed HTTP smoke checks.
+- `just build --no-restart` compiles only. A push or fast-forward does not update a running server.
+- Do not report a runtime merge complete until both lanes serve the rebuilt runtime after restart.
+- If permissions block a restart, report deployment blocked. Do not treat source sync as deployment success.
 - Do not run workspace DB checks, workspace refreshes, Temporal schedules, or broad log scans.
 
 ## 1. Land DatastarUI and refresh the copied source
@@ -128,29 +135,39 @@ test "$(git -C "$thoughts_repo" rev-parse HEAD)" = "$(git -C "$main_thoughts_rep
 
 ## 4. Build and restart stage
 
-Build from the working thoughts repo, then run its host-owned restart command for the stage runtime and worker. Read that command from the repo’s deployment docs/config; do not invent service-manager labels.
+Record the stage web PID or start time. Build from the working thoughts repo. Then run the host-owned restart command. Include the worker when its build outputs changed. Verify a new web PID or start time and the expected runtime binary path.
 
 ```bash
+set -euo pipefail
 cd "$thoughts_repo"
 just build --no-restart
+bash -lc "$VAMOS_STAGE_RESTART_CMD"
 stage_url=$VAMOS_STAGE_URL
-stage_code=$(curl -ksS -o /dev/null -w '%{http_code}' "$stage_url" -m 20)
+stage_code=$(curl -sS --retry 8 --retry-delay 1 --retry-connrefused \
+  -o /dev/null -w '%{http_code}' "$stage_url" -m 20)
 case "$stage_code" in 200|301|302|303|307|308) ;; *) exit 1 ;; esac
 ```
 
-Do not rebuild main if stage fails.
+Verify the changed page or asset at the stage public URL. A login redirect proves reachability, not the deployed UI version.
+
+If stage fails, do not rebuild main.
 
 ## 5. Build and restart main
 
-Build from the clean main thoughts baseline, then run its host-owned restart command for the main runtime and worker.
+**Do not skip this step after the fast-forward.** Record the main web PID or start time. Build from the clean main thoughts baseline. Then run the host-owned restart command. Include the worker when its build outputs changed. Verify a new web PID or start time and the expected runtime binary path.
 
 ```bash
+set -euo pipefail
 cd "$main_thoughts_repo"
 just build --no-restart
+bash -lc "$VAMOS_MAIN_RESTART_CMD"
 main_url=$VAMOS_MAIN_URL
-main_code=$(curl -ksS -o /dev/null -w '%{http_code}' "$main_url" -m 20)
+main_code=$(curl -sS --retry 8 --retry-delay 1 --retry-connrefused \
+  -o /dev/null -w '%{http_code}' "$main_url" -m 20)
 case "$main_code" in 200|301|302|303|307|308) ;; *) exit 1 ;; esac
 ```
+
+Verify the changed page or asset at the main public URL, not at localhost or stage. Verify the cache key when a JS/CSS asset changed. Do not claim success from an HTTP login redirect alone.
 
 ## 6. Report
 
@@ -165,4 +182,4 @@ printf 'stage: %s HTTP %s\nmain: %s HTTP %s\n' \
   "$stage_url" "$stage_code" "$main_url" "$main_code"
 ```
 
-Report the DatastarUI HEAD, the four stage/main HEADs, copied-source update result, pushes, builds/restarts, and both HTTP results. Success requires a clean DatastarUI copy, matching stage/main repo HEADs, and clean tracked baseline files.
+Report source sync and deployment separately: repo HEADs, pushes, builds, restarts, new process identity, and both public HTTP results. Include evidence that main serves the changed page or asset. Success requires matching repo HEADs, clean tracked baselines, and verified live deployments. If deployment was explicitly deferred, say **source synced; deployment not performed**.
