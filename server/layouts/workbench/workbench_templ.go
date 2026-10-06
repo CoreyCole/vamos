@@ -107,7 +107,7 @@ func Workbench(state WorkbenchState) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" class=\"flex h-full min-h-0 w-full overflow-hidden p-0\"><script type=\"module\" src=\"/js/workbench-resize.js?v=21\"></script><script type=\"module\" src=\"/js/workbench-history.js?v=23\"></script><script type=\"module\" src=\"/js/workbench-doc-scroll.js?v=3\"></script><script defer src=\"/js/frame-comment-bridge.js?v=4\" data-commentui-mode=\"parent\"></script><div class=\"flex min-h-0 w-full flex-col gap-0 overflow-hidden\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" class=\"flex h-full min-h-0 w-full overflow-hidden p-0\"><script type=\"module\" src=\"/js/workbench-resize.js?v=22\"></script><script type=\"module\" src=\"/js/workbench-history.js?v=23\"></script><script type=\"module\" src=\"/js/workbench-doc-scroll.js?v=3\"></script><script defer src=\"/js/frame-comment-bridge.js?v=4\" data-commentui-mode=\"parent\"></script><div class=\"flex min-h-0 w-full flex-col gap-0 overflow-hidden\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -522,7 +522,10 @@ func ChatColumnWithReopen(threadsOpen bool, artifactOpen bool, title string, cha
 			templ_7745c5c3_Var30 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = ChatColumnWithReopenMark(threadsOpen, artifactOpen, title, false, chat, overflow).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = ChatColumn(ChatColumnArgs{
+			ThreadsOpen: threadsOpen, ArtifactOpen: artifactOpen, Title: title,
+			ShowArtifactToggle: true, Chat: chat, Overflow: overflow,
+		}).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -552,7 +555,10 @@ func ChatColumnWithPlanReopen(threadsOpen bool, artifactOpen bool, title string,
 			templ_7745c5c3_Var31 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = ChatColumnWithReopenMark(threadsOpen, artifactOpen, title, true, chat, overflow).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = ChatColumn(ChatColumnArgs{
+			ThreadsOpen: threadsOpen, ArtifactOpen: artifactOpen, Title: title, PlanSwatch: true,
+			ShowArtifactToggle: true, Chat: chat, Overflow: overflow,
+		}).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -560,7 +566,7 @@ func ChatColumnWithPlanReopen(threadsOpen bool, artifactOpen bool, title string,
 	})
 }
 
-func ChatColumnWithReopenMark(threadsOpen bool, artifactOpen bool, title string, planSwatch bool, chat templ.Component, overflow templ.Component) templ.Component {
+func ChatColumn(args ChatColumnArgs) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -585,13 +591,13 @@ func ChatColumnWithReopenMark(threadsOpen bool, artifactOpen bool, title string,
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = ThreadsReopenControl(threadsOpen, "workbench-v2-threads-reopen").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = ThreadsReopenControl(args.ThreadsOpen, "workbench-v2-threads-reopen").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if title != "" {
-			if planSwatch {
-				var templ_7745c5c3_Var33 = []any{"h-2.5 w-2.5 shrink-0 rounded-full", ChatHeaderPlanSwatchClass(title)}
+		if args.Title != "" {
+			if args.PlanSwatch {
+				var templ_7745c5c3_Var33 = []any{"h-2.5 w-2.5 shrink-0 rounded-full", ChatHeaderPlanSwatchClass(args.Title)}
 				templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var33...)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
@@ -614,7 +620,7 @@ func ChatColumnWithReopenMark(threadsOpen bool, artifactOpen bool, title string,
 					return templ_7745c5c3_Err
 				}
 			} else {
-				var templ_7745c5c3_Var35 = []any{"flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold", ChatHeaderAvatarClass(title)}
+				var templ_7745c5c3_Var35 = []any{"flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold", ChatHeaderAvatarClass(args.Title)}
 				templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var35...)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
@@ -637,9 +643,9 @@ func ChatColumnWithReopenMark(threadsOpen bool, artifactOpen bool, title string,
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var37 string
-				templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(ChatHeaderInitial(title))
+				templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(ChatHeaderInitial(args.Title))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/workbench.templ`, Line: 143, Col: 168}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/workbench.templ`, Line: 149, Col: 178}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 				if templ_7745c5c3_Err != nil {
@@ -655,8 +661,8 @@ func ChatColumnWithReopenMark(threadsOpen bool, artifactOpen bool, title string,
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if title != "" {
-			parts := ParseChatHeaderTitle(title)
+		if args.Title != "" {
+			parts := ParseChatHeaderTitle(args.Title)
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "<p class=\"min-w-0 flex-1 truncate text-[13px] font-semibold leading-none text-foreground\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -664,7 +670,7 @@ func ChatColumnWithReopenMark(threadsOpen bool, artifactOpen bool, title string,
 			var templ_7745c5c3_Var38 string
 			templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(parts.Display)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/workbench.templ`, Line: 149, Col: 110}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/workbench.templ`, Line: 155, Col: 110}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 			if templ_7745c5c3_Err != nil {
@@ -682,7 +688,7 @@ func ChatColumnWithReopenMark(threadsOpen bool, artifactOpen bool, title string,
 				var templ_7745c5c3_Var39 string
 				templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(parts.Datetime)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/workbench.templ`, Line: 151, Col: 105}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/workbench.templ`, Line: 157, Col: 105}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 				if templ_7745c5c3_Err != nil {
@@ -698,12 +704,14 @@ func ChatColumnWithReopenMark(threadsOpen bool, artifactOpen bool, title string,
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = ArtifactReopenControl(artifactOpen, "workbench-v2-artifact-reopen").Render(ctx, templ_7745c5c3_Buffer)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
+		if args.ShowArtifactToggle {
+			templ_7745c5c3_Err = ArtifactReopenControl(args.ArtifactOpen, "workbench-v2-artifact-reopen").Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
-		if overflow != nil {
-			templ_7745c5c3_Err = overflow.Render(ctx, templ_7745c5c3_Buffer)
+		if args.Overflow != nil {
+			templ_7745c5c3_Err = args.Overflow.Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -717,7 +725,7 @@ func ChatColumnWithReopenMark(threadsOpen bool, artifactOpen bool, title string,
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = chat.Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = args.Chat.Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

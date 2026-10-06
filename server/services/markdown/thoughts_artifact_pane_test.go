@@ -77,8 +77,13 @@ func TestThoughtsArtifactPaneUsesSharedThreadChrome(t *testing.T) {
 	}
 	html := body.String()
 
-	if strings.Contains(html, `data-testid="artifact-close-details"`) {
-		t.Fatalf("thoughts workbench must not paint Close details")
+	for _, forbidden := range []string{
+		`data-testid="artifact-close-details"`,
+		`data-testid="artifact-details-primary"`,
+	} {
+		if strings.Contains(html, forbidden) {
+			t.Fatalf("thoughts workbench must not paint %s", forbidden)
+		}
 	}
 	for _, want := range []string{
 		`id="thread-artifact-path-header"`,
@@ -124,6 +129,80 @@ func TestThoughtsArtifactPaneUsesSharedThreadChrome(t *testing.T) {
 	if strings.Contains(html, `id="document-header-actions"`) ||
 		strings.Contains(html, "Document actions") {
 		t.Fatalf("legacy DocumentSurface WorkbenchActions bar present")
+	}
+}
+
+func TestThoughtsWorkbenchCannotHideDocument(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	mustMkdirAll(t, filepath.Join(root, "docs"))
+	mustWriteFile(t, filepath.Join(root, "docs", "example.md"), []byte("# Example\n"))
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{})
+
+	for _, directory := range []bool{false, true} {
+		for _, chatOpen := range []bool{false, true} {
+			req := httptest.NewRequest(http.MethodGet, "/thoughts/docs/example.md", nil)
+			req.AddCookie(&http.Cookie{Name: workbench.ArtifactOpenCookie, Value: "0"})
+			if chatOpen {
+				req.AddCookie(&http.Cookie{Name: workbench.ChatOpenCookie, Value: "1"})
+			}
+			c := echo.New().NewContext(req, httptest.NewRecorder())
+			var state workbench.WorkbenchState
+			if directory {
+				args, listingErr := svc.GetDirectoryListing("docs")
+				if listingErr != nil {
+					t.Fatal(listingErr)
+				}
+				state, err = svc.buildThoughtsDirectoryWorkbenchState(c, args)
+			} else {
+				state, err = svc.buildThoughtsWorkbenchState(
+					c,
+					&PageArgs{FilePath: "docs/example.md"},
+				)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			found := false
+			for _, region := range state.Regions {
+				if region.ID == workbench.WorkbenchV2ArtifactRegionID {
+					found = true
+					if !region.Visible {
+						t.Errorf(
+							"directory=%v chatOpen=%v: closed details cookie hid thoughts document",
+							directory,
+							chatOpen,
+						)
+					}
+				}
+			}
+			if !found {
+				t.Fatal("missing document region")
+			}
+			var body bytes.Buffer
+			if err := workbench.Workbench(state).Render(t.Context(), &body); err != nil {
+				t.Fatal(err)
+			}
+			for _, forbidden := range []string{
+				`data-testid="artifact-close-details"`,
+				`data-testid="artifact-details-primary"`,
+				`data-testid="artifact-open-details"`,
+			} {
+				if strings.Contains(body.String(), forbidden) {
+					t.Errorf(
+						"directory=%v chatOpen=%v: thoughts contains hide control %s",
+						directory,
+						chatOpen,
+						forbidden,
+					)
+				}
+			}
+		}
 	}
 }
 

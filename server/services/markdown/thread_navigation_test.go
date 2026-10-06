@@ -776,12 +776,15 @@ func TestPathHeaderShowsCloseDetailsWhenShowCloseDetails(t *testing.T) {
 		t.Fatal(err)
 	}
 	header := artifactPathHeader(t, body.String())
-	if !strings.Contains(header, `data-testid="artifact-close-details"`) {
-		t.Fatalf("opt-in path-header missing Close details:\n%s", header)
+	if strings.Count(header, `data-testid="artifact-details-primary"`) != 1 {
+		t.Fatalf(
+			"opt-in path-header must have exactly one Close details control:\n%s",
+			header,
+		)
 	}
 }
 
-func TestPathHeaderThreadsOmitCloseDetails(t *testing.T) {
+func TestPathHeaderOmitsCloseDetailsWhenDisabled(t *testing.T) {
 	var body strings.Builder
 	if err := ThreadArtifactPane(
 		ThreadArtifactBrowserArgs{
@@ -794,8 +797,9 @@ func TestPathHeaderThreadsOmitCloseDetails(t *testing.T) {
 		t.Fatal(err)
 	}
 	header := artifactPathHeader(t, body.String())
-	if strings.Contains(header, `data-testid="artifact-close-details"`) {
-		t.Fatalf("V2 threads path-header must not paint Close details:\n%s", header)
+	if strings.Contains(header, `data-testid="artifact-close-details"`) ||
+		strings.Contains(header, `data-testid="artifact-details-primary"`) {
+		t.Fatalf("disabled path-header must not paint Close details:\n%s", header)
 	}
 }
 
@@ -805,7 +809,7 @@ func TestPathHeaderOpenPaneHasDetailsPrimaryLeftOfKebab(t *testing.T) {
 		ThreadArtifactBrowserArgs{
 			ThreadID:         "thread-1",
 			DocPath:          "owner/plans/alpha/design.md",
-			ShowCloseDetails: false,
+			ShowCloseDetails: true,
 			HeaderActions: BuildThreadArtifactHeaderActions(
 				nil,
 				"owner/plans/alpha/design.md",
@@ -843,7 +847,8 @@ func TestPathHeaderHidesCloseDetailsWhenDisabled(t *testing.T) {
 		t.Fatal(err)
 	}
 	header := artifactPathHeader(t, body.String())
-	if strings.Contains(header, `data-testid="artifact-close-details"`) {
+	if strings.Contains(header, `data-testid="artifact-close-details"`) ||
+		strings.Contains(header, `data-testid="artifact-details-primary"`) {
 		t.Fatalf("thoughts path-header still has Close details:\n%s", header)
 	}
 }

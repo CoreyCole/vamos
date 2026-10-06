@@ -286,7 +286,7 @@ func TestThoughtsDocHonorsChatOpenCookieZero(t *testing.T) {
 	}
 }
 
-func TestThoughtsDocHonorsArtifactOpenCookieZero(t *testing.T) {
+func TestThoughtsDocIgnoresArtifactOpenCookieZero(t *testing.T) {
 	root := t.TempDir()
 	mustMkdirAll(t, filepath.Join(root, "docs", "vamos"))
 	mustWriteFile(
@@ -322,7 +322,7 @@ func TestThoughtsDocHonorsArtifactOpenCookieZero(t *testing.T) {
 			artifactVisible = region.Visible
 		}
 	}
-	if artifactVisible {
-		t.Fatal("wb2_artifact_open=0 must not force ArtifactOpen true")
+	if !artifactVisible {
+		t.Fatal("closed thread details must not hide the thoughts document")
 	}
 }

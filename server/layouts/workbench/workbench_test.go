@@ -2136,7 +2136,7 @@ func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 	for _, fragment := range []string{
 		`data-workbench-region="workbench-v2-chat"`,
 		`data-workbench-min-rem="18"`,
-		`/js/workbench-resize.js?v=21`,
+		`/js/workbench-resize.js?v=22`,
 		`/js/workbench-history.js?v=23`,
 	} {
 		if !strings.Contains(html, fragment) {

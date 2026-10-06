@@ -5,7 +5,10 @@ async function mergeWorkbenchPaths(patches) {
   mergePaths(patches);
 }
 
-const roots = new WeakSet();
+let observedContainer;
+const containerResizeObserver = new ResizeObserver(() => {
+  reflowWorkbenchesAfterWindowResize();
+});
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
@@ -96,9 +99,10 @@ function availableRegionWidth(root) {
 }
 
 function setRegionWidth(region, pixels) {
-  const width = `${Math.max(0, pixels).toFixed(2)}px`;
-  region.style.flex = `0 0 ${width}`;
-  region.style.width = width;
+  const width = `${Number(Math.max(0, pixels).toFixed(2))}px`;
+  const flex = `0 0 ${width}`;
+  if (region.style.flex !== flex) region.style.flex = flex;
+  if (region.style.width !== width) region.style.width = width;
 }
 
 function regionMinWidth(region) {
@@ -523,12 +527,12 @@ function reflowVisibleRegionFlex(root) {
   const grower = layoutGrower(regions);
   for (const region of regions) {
     const ratio = Number(region.dataset.workbenchRatio || 0);
-    if (region === grower) {
-      region.style.flex = "1 1 0%";
-    } else if (ratio > 0) {
-      region.style.flex = "0 0 " + (ratio * 100).toFixed(2) + "%";
-    }
-    region.style.removeProperty("width");
+    const flex =
+      region === grower
+        ? "1 1 0%"
+        : "0 0 " + Number((ratio * 100).toFixed(2)) + "%";
+    if (region.style.flex !== flex) region.style.flex = flex;
+    if (region.style.width) region.style.removeProperty("width");
   }
 }
 
@@ -542,13 +546,18 @@ function reflowWorkbenchFromEvent(event) {
 function initWorkbench(root) {
   // Don't fight an in-progress grip drag (MutationObserver style/class churn).
   if (!document.documentElement.classList.contains("workbench-resizing")) {
-    applyRegionRatios(root);
+    reflowVisibleRegionFlex(root);
   }
   bindResizeHandles(root);
-  roots.add(root);
 }
 
 function init() {
+  const container = document.getElementById("workbench-regions");
+  if (container !== observedContainer) {
+    containerResizeObserver.disconnect();
+    observedContainer = container;
+    if (container) containerResizeObserver.observe(container);
+  }
   for (const root of document.querySelectorAll("#workbench-root")) {
     initWorkbench(root);
   }
@@ -561,8 +570,7 @@ function reflowWorkbenchesAfterWindowResize() {
     windowResizeFrame = undefined;
     for (const root of document.querySelectorAll("#workbench-root")) {
       if (root.dataset.workbenchPixelLock !== "1") {
-        // SSR flex scales with container — do not snap to pixels on window resize.
-        updateHandles(root);
+        reflowVisibleRegionFlex(root);
         continue;
       }
       for (const region of allRegions(root)) {

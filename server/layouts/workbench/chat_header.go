@@ -7,7 +7,19 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/a-h/templ"
 )
+
+type ChatColumnArgs struct {
+	ThreadsOpen        bool
+	ArtifactOpen       bool
+	Title              string
+	PlanSwatch         bool
+	ShowArtifactToggle bool
+	Chat               templ.Component
+	Overflow           templ.Component
+}
 
 func ChatHeaderInitial(title string) string {
 	runes := []rune(strings.TrimSpace(title))

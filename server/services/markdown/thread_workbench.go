@@ -93,17 +93,14 @@ func (s *Service) thoughtsWorkbenchChatColumn(
 			artifact,
 		)
 	}
-	column := workbench.ChatColumnWithReopen
-	if thoughtsChatHref(s.basePath, docPath) != "" || planLeadRoomID(docPath) != "" {
-		column = workbench.ChatColumnWithPlanReopen
-	}
-	return column(
-		threadsOpen,
-		workbench.ArtifactOpenFromRequest(c.Request()),
-		title,
-		body,
-		overflow,
-	), nil
+	return workbench.ChatColumn(workbench.ChatColumnArgs{
+		ThreadsOpen: threadsOpen,
+		Title:       title,
+		PlanSwatch: thoughtsChatHref(s.basePath, docPath) != "" ||
+			planLeadRoomID(docPath) != "",
+		Chat:     body,
+		Overflow: overflow,
+	}), nil
 }
 
 func (s *Service) savedThreadsWorkbenchConfig(

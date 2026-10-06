@@ -494,7 +494,7 @@ func (s *Service) buildThoughtsV2WorkbenchState(
 		Comments:     comments,
 		ThreadsOpen:  threadsOpen,
 		ChatOpen:     chatOpen,
-		ArtifactOpen: workbench.ArtifactOpenFromRequest(c.Request()),
+		ArtifactOpen: true,
 		CommentsOpen: commentsOpen,
 	})
 }
@@ -664,7 +664,7 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 		Comments:     EmptyDirectoryContextPanel(),
 		ThreadsOpen:  threadsOpen,
 		ChatOpen:     chatOpen,
-		ArtifactOpen: workbench.ArtifactOpenFromRequest(c.Request()),
+		ArtifactOpen: true,
 		CommentsOpen: commentsOpen,
 	})
 }

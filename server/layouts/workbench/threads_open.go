@@ -37,7 +37,7 @@ func threadsOpenCookieWriteJS(open bool) string {
 }
 
 func threadsLayoutReflowJS() string {
-	return "requestAnimationFrame(() => document.getElementById('workbench-root')?.dispatchEvent(new CustomEvent('workbench-layout-reflow')))"
+	return "requestAnimationFrame(() => document.getElementById('workbench-root')?.dispatchEvent(new CustomEvent('workbench-layout-reflow', {bubbles: true})))"
 }
 
 // ThreadsHideClickAction collapses the threads sidebar and persists via cookie.

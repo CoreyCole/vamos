@@ -59,7 +59,7 @@ type ThreadArtifactBrowserArgs struct {
 	ThreadsOpen       bool
 	// ShowReload paints the dedicated path-header Reload icon (iframe src reset only).
 	ShowReload bool
-	// ShowCloseDetails paints >> Close details in the path header. V2 threads/plan/thoughts hide it; chat-header toggle owns close.
+	// Thoughts documents are primary content, not dismissible details.
 	ShowCloseDetails bool
 	// BrowserOpen is the SSR Files-browser preference (cookie wb2_artifact_browser).
 	// Default closed when unset so first visit does not show the sibling file list.
@@ -586,7 +586,7 @@ func (s *Service) threadArtifactBrowser(
 		BrowserOpen:      ArtifactBrowserOpenFromRequest(c.Request()),
 		CommentsOpen:     workbench.CommentsOpenFromRequest(c.Request()),
 		ChatOpen:         chatOpen,
-		ShowCloseDetails: false,
+		ShowCloseDetails: true,
 	}
 	if directoryPath != "" && docPath != "" {
 		parent := path.Dir(directoryPath)
@@ -1169,12 +1169,4 @@ func (s *Service) HandleThoughtsArtifactDirectory(c echo.Context) error {
 	)
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	return sse.PatchElementTempl(ThreadArtifactDirectory(entry))
-}
-
-func artifactHideClickAction() string {
-	return workbench.ArtifactHideClickAction()
-}
-
-func artifactHideControlTitle() string {
-	return workbench.ArtifactHideControlTitle()
 }

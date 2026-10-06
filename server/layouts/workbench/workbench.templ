@@ -12,7 +12,7 @@ templ Workbench(state WorkbenchState) {
 		data-on:keydown__window={ ThreadsToggleHotkeyAction() }
 		class="flex h-full min-h-0 w-full overflow-hidden p-0"
 	>
-		<script type="module" src="/js/workbench-resize.js?v=21"></script>
+		<script type="module" src="/js/workbench-resize.js?v=22"></script>
 		<script type="module" src="/js/workbench-history.js?v=23"></script>
 		<script type="module" src="/js/workbench-doc-scroll.js?v=3"></script>
 		<script defer src="/js/frame-comment-bridge.js?v=4" data-commentui-mode="parent"></script>
@@ -120,47 +120,55 @@ templ ArtifactDetailsPrimaryControl() {
 // Threads reopen lives in that header (same row as title) — never a strip above.
 // overflow is the single desktop ⋯ menu (Share + optional Artifact); nil => Share stubs only.
 templ ChatColumnWithReopen(threadsOpen bool, artifactOpen bool, title string, chat templ.Component, overflow templ.Component) {
-	@ChatColumnWithReopenMark(threadsOpen, artifactOpen, title, false, chat, overflow)
+	@ChatColumn(ChatColumnArgs{
+		ThreadsOpen: threadsOpen, ArtifactOpen: artifactOpen, Title: title,
+		ShowArtifactToggle: true, Chat: chat, Overflow: overflow,
+	})
 }
 
 // ChatColumnWithPlanReopen is ChatColumnWithReopen with a color swatch (no letter/number glyph).
 templ ChatColumnWithPlanReopen(threadsOpen bool, artifactOpen bool, title string, chat templ.Component, overflow templ.Component) {
-	@ChatColumnWithReopenMark(threadsOpen, artifactOpen, title, true, chat, overflow)
+	@ChatColumn(ChatColumnArgs{
+		ThreadsOpen: threadsOpen, ArtifactOpen: artifactOpen, Title: title, PlanSwatch: true,
+		ShowArtifactToggle: true, Chat: chat, Overflow: overflow,
+	})
 }
 
-templ ChatColumnWithReopenMark(threadsOpen bool, artifactOpen bool, title string, planSwatch bool, chat templ.Component, overflow templ.Component) {
+templ ChatColumn(args ChatColumnArgs) {
 	<div class="flex h-full min-h-0 flex-col bg-background">
 		<header id="workbench-v2-chat-header" class="hidden h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-2.5 md:flex">
-			@ThreadsReopenControl(threadsOpen, "workbench-v2-threads-reopen")
-			if title != "" {
-				if planSwatch {
+			@ThreadsReopenControl(args.ThreadsOpen, "workbench-v2-threads-reopen")
+			if args.Title != "" {
+				if args.PlanSwatch {
 					<span
-						class={ "h-2.5 w-2.5 shrink-0 rounded-full", ChatHeaderPlanSwatchClass(title) }
+						class={ "h-2.5 w-2.5 shrink-0 rounded-full", ChatHeaderPlanSwatchClass(args.Title) }
 						aria-hidden="true"
 						data-chat-plan-swatch
 					></span>
 				} else {
-					<span class={ "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold", ChatHeaderAvatarClass(title) }>{ ChatHeaderInitial(title) }</span>
+					<span class={ "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold", ChatHeaderAvatarClass(args.Title) }>{ ChatHeaderInitial(args.Title) }</span>
 				}
 			}
 			<div class="flex min-h-0 min-w-0 flex-1 items-center gap-2">
-				if title != "" {
-					{{ parts := ParseChatHeaderTitle(title) }}
+				if args.Title != "" {
+					{{ parts := ParseChatHeaderTitle(args.Title) }}
 					<p class="min-w-0 flex-1 truncate text-[13px] font-semibold leading-none text-foreground">{ parts.Display }</p>
 					if parts.Datetime != "" {
 						<span class="shrink-0 text-[11px] tabular-nums leading-none text-muted-foreground">{ parts.Datetime }</span>
 					}
 				}
 			</div>
-			@ArtifactReopenControl(artifactOpen, "workbench-v2-artifact-reopen")
-			if overflow != nil {
-				@overflow
+			if args.ShowArtifactToggle {
+				@ArtifactReopenControl(args.ArtifactOpen, "workbench-v2-artifact-reopen")
+			}
+			if args.Overflow != nil {
+				@args.Overflow
 			} else {
 				@ChatHeaderShareOverflow()
 			}
 		</header>
 		<div class="flex min-h-0 flex-1 flex-col overflow-hidden">
-			@chat
+			@args.Chat
 		</div>
 	</div>
 }

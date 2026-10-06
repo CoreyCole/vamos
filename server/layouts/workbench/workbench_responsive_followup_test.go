@@ -20,7 +20,7 @@ func TestWorkbenchResizeReflowsVisibleColumnsOnThreadsToggle(t *testing.T) {
 		"function applyRegionVisible(regionID, visible)",
 		`getAttribute("data-workbench-visible")`,
 		`document.addEventListener("workbench-layout-reflow", reflowWorkbenchFromEvent)`,
-		`region.style.flex = "0 0 " + (ratio * 100).toFixed(2) + "%"`,
+		`"0 0 " + Number((ratio * 100).toFixed(2)) + "%"`,
 		"Number(region.dataset.workbenchRatio || 0) * availableWidth",
 		"function layoutGrower(regions)",
 		"regions.find(isChatColumn)",
@@ -85,7 +85,7 @@ func TestWorkbenchV2ThreadsHasIndependentHideAndReopenControls(t *testing.T) {
 		`aria-label="Roster sidebar (Ctrl+B)"`,
 		`$workbench.regions.workbenchV2Threads.visible === false`,
 		`wb2_threads_open=1`,
-		`/js/workbench-resize.js?v=21`,
+		`/js/workbench-resize.js?v=22`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("workbench threads reopen control missing %q", want)
