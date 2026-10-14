@@ -58,7 +58,7 @@ func TestHandleThoughtsArtifactSearchSplitsDirectoryAndGlobal(t *testing.T) {
 		`data-testid="artifact-search-all-thoughts"`,
 		"This directory",
 		"All thoughts",
-		`href="/rooms/plan/alpha?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fnotes.md"`,
+		`href="/thoughts/owner/plans/alpha/notes.md"`,
 		`href="/thoughts/owner/shared/notebook.md"`,
 	} {
 		if !strings.Contains(body, want) {
@@ -73,7 +73,7 @@ func TestHandleThoughtsArtifactSearchSplitsDirectoryAndGlobal(t *testing.T) {
 	dirSection := body[dirStart:globalStart]
 	if !strings.Contains(
 		dirSection,
-		"/rooms/plan/alpha?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fnotes.md",
+		"/thoughts/owner/plans/alpha/notes.md",
 	) {
 		t.Fatalf("notes.md should be in this directory: %s", dirSection)
 	}
@@ -86,7 +86,7 @@ func TestHandleThoughtsArtifactSearchSplitsDirectoryAndGlobal(t *testing.T) {
 	}
 	if strings.Contains(
 		globalSection,
-		"/rooms/plan/alpha?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fnotes.md",
+		"/thoughts/owner/plans/alpha/notes.md",
 	) {
 		t.Fatalf("cwd hit duplicated in all thoughts: %s", globalSection)
 	}
@@ -125,7 +125,7 @@ func TestHandleThoughtsArtifactSearchEmptyQueryReturnsListing(t *testing.T) {
 	}
 	if !strings.Contains(
 		body,
-		`href="/rooms/plan/alpha?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fdesign.md`,
+		`href="/thoughts/owner/plans/alpha/design.md"`,
 	) {
 		t.Fatalf("empty query missing cwd listing: %s", body)
 	}
@@ -235,7 +235,7 @@ func TestHandleThoughtsArtifactSearchFindsFileByNameNotPathDirs(t *testing.T) {
 	)
 	if !strings.Contains(
 		body,
-		`href="/rooms/plan/alpha?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fdir-39%2Funique-target.md"`,
+		`href="/thoughts/owner/plans/alpha/dir-39/unique-target.md"`,
 	) {
 		t.Fatalf("filename search missed unique-target.md: %s", body)
 	}
@@ -266,7 +266,7 @@ func TestHandleThoughtsArtifactSearchFindsFileByNameNotPathDirs(t *testing.T) {
 	dirSection := design[dirStart:globalStart]
 	if !strings.Contains(
 		dirSection,
-		`href="/rooms/plan/alpha?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fdesign.md"`,
+		`href="/thoughts/owner/plans/alpha/design.md"`,
 	) {
 		t.Fatalf("this directory missed design.md by filename: %s", dirSection)
 	}
@@ -325,7 +325,7 @@ func TestHandleThoughtsArtifactSearchThisDirectoryWalksNestedFiles(t *testing.T)
 	dirSection := body[dirStart:globalStart]
 	if !strings.Contains(
 		dirSection,
-		`href="/rooms/plan/alpha?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fdesign.md"`,
+		`href="/thoughts/owner/plans/alpha/design.md"`,
 	) {
 		t.Fatalf("this directory missed nested design.md: %s", dirSection)
 	}
@@ -470,7 +470,7 @@ func TestHandleThoughtsArtifactSearchRootUsesSingleAllThoughtsSection(t *testing
 	}
 	section := body[globalStart:]
 	for _, want := range []string{
-		`href="/rooms/plan/alpha?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fdesign.md"`,
+		`href="/thoughts/owner/plans/alpha/design.md"`,
 		">alpha/design.md<",
 		">alpha/design/<",
 		">shared/design/<",
@@ -564,8 +564,8 @@ func TestHandleThoughtsArtifactSearchOrdersHitsByModTime(t *testing.T) {
 		t.Fatalf("missing search sections: %s", body)
 	}
 	dirSection := body[dirStart:globalStart]
-	newerHref := `href="/rooms/plan/alpha?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Frecency-zeta.md"`
-	olderHref := `href="/rooms/plan/alpha?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Frecency-alpha.md"`
+	newerHref := `href="/thoughts/owner/plans/alpha/recency-zeta.md"`
+	olderHref := `href="/thoughts/owner/plans/alpha/recency-alpha.md"`
 	newerAt := strings.Index(dirSection, newerHref)
 	olderAt := strings.Index(dirSection, olderHref)
 	if newerAt < 0 || olderAt < 0 || newerAt > olderAt {

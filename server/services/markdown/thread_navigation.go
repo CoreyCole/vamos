@@ -181,20 +181,11 @@ func withArtifactDirQuery(href, directoryPath string) string {
 	return parsed.String()
 }
 
-// scopedBrowseArtifactHref is the Files / parent GET for an artifact pane.
-// Click-in keeps /threads/{id}. Empty threadID on a plan-scoped doc stays on
-// /rooms/plan/{id}?artifact= (plus artifact_dir), never pick-scope /threads.
 func scopedBrowseArtifactHref(threadID, docPath, directoryPath string) string {
 	if strings.TrimSpace(threadID) != "" {
 		return ThreadArtifactHrefAtDirectory(threadID, docPath, directoryPath)
 	}
-	if href := thoughtsBotHomeHref(docPath); href != "" {
-		return withArtifactDirQuery(href, directoryPath)
-	}
-	if href := thoughtsChatHref("", docPath); href != "" {
-		return withArtifactDirQuery(href, directoryPath)
-	}
-	return ThreadArtifactHrefAtDirectory("", docPath, directoryPath)
+	return thoughtsArtifactPageURL(docPath, directoryPath)
 }
 
 func ThreadArtifactBrowserEndpoint(threadID, docPath, directoryPath string) string {

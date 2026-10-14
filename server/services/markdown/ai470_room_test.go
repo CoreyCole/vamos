@@ -69,7 +69,7 @@ func TestServeAI470RoomUsesArtifactPathForPlanChat(t *testing.T) {
 		"design.md",
 		"AGENTS.md",
 		`name="attached_paths[]"`,
-		`/rooms/plan/real-plan?artifact=thoughts%2Fcreative-mode-agent%2Fplans%2Freal-plan%2FAGENTS.md`,
+		`/thoughts/creative-mode-agent/plans/real-plan/AGENTS.md`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("missing %q: %s", want, body)

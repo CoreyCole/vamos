@@ -14,21 +14,18 @@ import (
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 )
 
-func TestScopedBrowseArtifactHrefUsesDMRoomForBotHome(t *testing.T) {
+func TestScopedBrowseArtifactHrefUsesThoughtsForBotHome(t *testing.T) {
 	t.Parallel()
 
 	doc := "thoughts/agents/nova/MEMORY.md"
 	dir := "thoughts/agents/nova"
 	got := scopedBrowseArtifactHref("", doc, dir)
-	wantPrefix := "/rooms/dm/nova?artifact="
-	if !strings.HasPrefix(got, wantPrefix) {
-		t.Fatalf("href = %q, want prefix %q", got, wantPrefix)
+	want := ThoughtsDocURLAtDirectory(doc, dir)
+	if got != want {
+		t.Fatalf("href = %q, want %q", got, want)
 	}
-	if strings.Contains(got, "/threads?") {
-		t.Fatalf("empty threadID bounced to /threads: %q", got)
-	}
-	if strings.Contains(got, "/rooms/plan/agents--nova") {
-		t.Fatalf("bot home used plan room: %q", got)
+	if strings.Contains(got, "/rooms/") || strings.Contains(got, "/threads?") {
+		t.Fatalf("file browser left thoughts: %q", got)
 	}
 	if got := scopedBrowseArtifactHref(
 		"thread_1",
@@ -60,21 +57,24 @@ func TestBotHomeParentHrefStaysInsideHome(t *testing.T) {
 	}
 }
 
-func TestScopedBrowseArtifactHrefUsesPlanRoomWhenThreadEmpty(t *testing.T) {
+func TestScopedBrowseArtifactHrefUsesThoughtsWhenThreadEmpty(t *testing.T) {
 	t.Parallel()
 
 	doc := "thoughts/owner/plans/alpha/AGENTS.md"
 	dir := "thoughts/owner/plans/alpha"
 	got := scopedBrowseArtifactHref("", doc, dir)
-	wantPrefix := "/rooms/plan/alpha?artifact=thoughts%2Fowner%2Fplans%2Falpha%2FAGENTS.md"
-	if !strings.HasPrefix(got, wantPrefix) {
-		t.Fatalf("href = %q, want prefix %q", got, wantPrefix)
+	want := ThoughtsDocURLAtDirectory(doc, dir)
+	if got != want {
+		t.Fatalf("href = %q, want %q", got, want)
+	}
+	if !strings.HasPrefix(got, "/thoughts/owner/plans/alpha/AGENTS.md?") {
+		t.Fatalf("href = %q", got)
 	}
 	if !strings.Contains(got, "artifact_dir=thoughts%2Fowner%2Fplans%2Falpha") {
 		t.Fatalf("missing artifact_dir: %q", got)
 	}
-	if strings.Contains(got, "/threads?") {
-		t.Fatalf("empty threadID bounced to /threads: %q", got)
+	if strings.Contains(got, "/rooms/") || strings.Contains(got, "/threads?") {
+		t.Fatalf("file browser left thoughts: %q", got)
 	}
 	if got := scopedBrowseArtifactHref(
 		"thread_1",
