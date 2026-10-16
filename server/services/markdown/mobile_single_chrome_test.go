@@ -27,7 +27,10 @@ func TestThreadWorkbenchPageHidesAppHeaderBelowMd(t *testing.T) {
 		t.Fatalf("BuildWorkbenchV2State: %v", err)
 	}
 	var body bytes.Buffer
-	if err := ThreadWorkbenchPage("t@example.com", state).Render(t.Context(), &body); err != nil {
+	if err := ThreadWorkbenchPage(
+		"t@example.com",
+		state,
+	).Render(t.Context(), &body); err != nil {
 		t.Fatalf("ThreadWorkbenchPage.Render: %v", err)
 	}
 	html := body.String()
@@ -40,7 +43,51 @@ func TestThreadWorkbenchPageHidesAppHeaderBelowMd(t *testing.T) {
 	if !strings.Contains(html, `id="workbench-mobile-chat-comments"`) {
 		t.Fatalf("missing shared mobile icon header: %s", html)
 	}
-	if strings.Contains(html, `id="workbench-mobile-tabs"`) || strings.Contains(html, `role="tablist"`) {
+	if strings.Contains(html, `id="workbench-mobile-tabs"`) ||
+		strings.Contains(html, `role="tablist"`) {
 		t.Fatalf("unexpected mobile tablist: %s", html)
+	}
+}
+
+func TestThoughtsPagesHideExtraMobileToolbar(t *testing.T) {
+	t.Parallel()
+
+	page := (&PageArgs{FilePath: "docs/example.md", UserEmail: "t@example.com"}).BuildRootArgs()
+	if !page.HideHeaderBelowMd {
+		t.Fatal("thoughts document must hide #app-header below md")
+	}
+	dir := (&DirectoryArgs{Path: "docs", UserEmail: "t@example.com"}).BuildRootArgs()
+	if !dir.HideHeaderBelowMd {
+		t.Fatal("thoughts directory must hide #app-header below md")
+	}
+
+	state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
+		ViewportClass: workbench.ViewportMobile,
+		ArtifactOpen:  true,
+		Threads:       templ.NopComponent,
+		Chat:          templ.NopComponent,
+		Artifact:      templ.NopComponent,
+		Comments:      templ.NopComponent,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.SuppressMobileHeaderOnArtifact = true
+	var body bytes.Buffer
+	if err := workbench.Workbench(state).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	html := body.String()
+	header := html[strings.Index(html, `id="workbench-mobile-chat-comments"`):]
+	if end := strings.Index(header, "</div>"); end > 0 {
+		header = header[:end]
+	}
+	for _, want := range []string{
+		"max-md:hidden",
+		`data-class="{ 'max-md:hidden': $workbench.activeRegionID === 'workbenchV2Artifact' }"`,
+	} {
+		if !strings.Contains(header, want) {
+			t.Fatalf("thoughts mobile icon header missing %q:\n%s", want, header)
+		}
 	}
 }

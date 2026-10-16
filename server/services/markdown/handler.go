@@ -479,24 +479,37 @@ func (s *Service) buildThoughtsV2WorkbenchState(
 		return workbench.WorkbenchState{}, err
 	}
 	threadsOpen, chatOpen, commentsOpen := thoughtsChromeOpen(c.Request())
-	return workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
-		UserEmail:     pageArgs.UserEmail,
-		ViewportClass: viewport,
-		SavedConfig:   s.savedThreadsWorkbenchConfig(c, pageArgs.UserEmail, viewport),
-		Threads: agenthome.RosterRail(
-			s.liveRoster(
-				c.Request().Context(),
-				s.rosterSelectionForThoughtsDoc(canonical),
+	return withThoughtsMobileChrome(
+		workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
+			UserEmail:     pageArgs.UserEmail,
+			ViewportClass: viewport,
+			SavedConfig:   s.savedThreadsWorkbenchConfig(c, pageArgs.UserEmail, viewport),
+			Threads: agenthome.RosterRail(
+				s.liveRoster(
+					c.Request().Context(),
+					s.rosterSelectionForThoughtsDoc(canonical),
+				),
 			),
-		),
-		Chat:         chat,
-		Artifact:     artifact,
-		Comments:     comments,
-		ThreadsOpen:  threadsOpen,
-		ChatOpen:     chatOpen,
-		ArtifactOpen: true,
-		CommentsOpen: commentsOpen,
-	})
+			Chat:         chat,
+			Artifact:     artifact,
+			Comments:     comments,
+			ThreadsOpen:  threadsOpen,
+			ChatOpen:     chatOpen,
+			ArtifactOpen: true,
+			CommentsOpen: commentsOpen,
+		}),
+	)
+}
+
+func withThoughtsMobileChrome(
+	state workbench.WorkbenchState,
+	err error,
+) (workbench.WorkbenchState, error) {
+	if err != nil {
+		return state, err
+	}
+	state.SuppressMobileHeaderOnArtifact = true
+	return state, nil
 }
 
 func (s *Service) buildThoughtsWorkbenchState(
@@ -649,24 +662,26 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 		return workbench.WorkbenchState{}, err
 	}
 	threadsOpen, chatOpen, commentsOpen := thoughtsChromeOpen(c.Request())
-	return workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
-		UserEmail:     args.UserEmail,
-		ViewportClass: viewport,
-		SavedConfig:   s.savedThreadsWorkbenchConfig(c, args.UserEmail, viewport),
-		Threads: agenthome.RosterRail(
-			s.liveRoster(
-				c.Request().Context(),
-				s.rosterSelectionForThoughtsDoc(dirPath),
+	return withThoughtsMobileChrome(
+		workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
+			UserEmail:     args.UserEmail,
+			ViewportClass: viewport,
+			SavedConfig:   s.savedThreadsWorkbenchConfig(c, args.UserEmail, viewport),
+			Threads: agenthome.RosterRail(
+				s.liveRoster(
+					c.Request().Context(),
+					s.rosterSelectionForThoughtsDoc(dirPath),
+				),
 			),
-		),
-		Chat:         chat,
-		Artifact:     artifact,
-		Comments:     EmptyDirectoryContextPanel(),
-		ThreadsOpen:  threadsOpen,
-		ChatOpen:     chatOpen,
-		ArtifactOpen: true,
-		CommentsOpen: commentsOpen,
-	})
+			Chat:         chat,
+			Artifact:     artifact,
+			Comments:     EmptyDirectoryContextPanel(),
+			ThreadsOpen:  threadsOpen,
+			ChatOpen:     chatOpen,
+			ArtifactOpen: true,
+			CommentsOpen: commentsOpen,
+		}),
+	)
 }
 
 func thoughtsNormalRegions(contextVisible bool) []workbench.RegionNormalState {

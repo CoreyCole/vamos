@@ -115,9 +115,11 @@ type WorkbenchState struct {
 	FocusDefault  bool
 	NormalRegions []RegionNormalState
 
-	// MobileChatCommentsHeader is shared v2 mobile chrome above #workbench-regions.
-	// Thoughts leaves this false (CenterDocPane owns sidebar/chat icons).
+	// MobileChatCommentsHeader is the v2 icon row above #workbench-regions.
 	MobileChatCommentsHeader bool
+	// SuppressMobileHeaderOnArtifact hides that row on mobile while the artifact
+	// pane is active. Thoughts path-header already has those controls.
+	SuppressMobileHeaderOnArtifact bool
 }
 
 type BuildWorkbenchStateInput struct {

@@ -57,6 +57,16 @@ func TestThreadsToggleClickActionsWriteCookieNotLayoutSave(t *testing.T) {
 	if !strings.Contains(show, "visible = true") || !strings.Contains(show, "=1;") {
 		t.Fatalf("show action = %q", show)
 	}
+	if !strings.Contains(show, "$workbench.activeRegionID = 'workbenchV2Threads'") ||
+		!strings.Contains(show, "dataset.workbenchMobileActive = 'workbenchV2Threads'") {
+		t.Fatalf("show must switch mobile active region: %q", show)
+	}
+	if !strings.Contains(hide, "$workbench.activeRegionID = 'workbenchV2Artifact'") {
+		t.Fatalf(
+			"hide must restore artifact mobile active when the pane is open: %q",
+			hide,
+		)
+	}
 	for _, action := range []string{hide, show} {
 		if !strings.Contains(action, "workbench-layout-reflow") {
 			t.Fatalf("toggle must reflow chat/doc split: %q", action)

@@ -45,6 +45,9 @@ func TestThoughtsPlanDocIsFullscreenWithPlanLeadChatLink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !state.SuppressMobileHeaderOnArtifact {
+		t.Fatal("thoughts must suppress the extra mobile icon toolbar on the document")
+	}
 	var body bytes.Buffer
 	if err := workbench.Workbench(state).Render(t.Context(), &body); err != nil {
 		t.Fatal(err)

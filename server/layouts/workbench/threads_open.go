@@ -43,13 +43,26 @@ func threadsLayoutReflowJS() string {
 // ThreadsHideClickAction collapses the threads sidebar and persists via cookie.
 func ThreadsHideClickAction() string {
 	return "$workbench.regions.workbenchV2Threads.visible = false; " +
-		threadsOpenCookieWriteJS(false) + "; " + threadsLayoutReflowJS()
+		threadsOpenCookieWriteJS(false) + "; " +
+		restoreArtifactMobileActiveJS() +
+		threadsLayoutReflowJS()
 }
 
 // ThreadsShowClickAction reopens the threads sidebar and persists via cookie.
 func ThreadsShowClickAction(signalKey string) string {
 	return "$workbench.regions." + signalKey + ".visible = true; " +
+		setMobileActiveJS(signalKey) + "; " +
 		threadsOpenCookieWriteJS(true) + "; " + threadsLayoutReflowJS()
+}
+
+func setMobileActiveJS(signalKey string) string {
+	return "$workbench.activeRegionID = '" + signalKey + "'; " +
+		"try { ((el && el.closest) ? el.closest('#workbench-root') : document.getElementById('workbench-root')).dataset.workbenchMobileActive = '" + signalKey + "' } catch (e) {}"
+}
+
+func restoreArtifactMobileActiveJS() string {
+	return "if ($workbench.regions.workbenchV2Artifact.visible) { " +
+		setMobileActiveJS(SignalKeyForID(WorkbenchV2ArtifactRegionID)) + " }; "
 }
 
 // ThreadsToggleClickAction opens or closes the roster and persists the cookie.

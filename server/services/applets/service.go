@@ -258,32 +258,37 @@ func (s *Service) RenderAppletPage(c echo.Context, applet AppletContext, process
 		commentsPanel = commentui.CommentsContextPanel(commentui.BuildCommentsPanelArgs(ui, ""))
 	}
 	rootArgs := layouts.RootArgs{
-		Title:       applet.Manifest.Title + " Applet",
-		CurrentPath: applet.IdentityPath,
-		PageType:    layouts.PageTypeMarkdown,
-		ShowHeader:  true,
-		UserEmail:   userEmail,
+		Title:             applet.Manifest.Title + " Applet",
+		CurrentPath:       applet.IdentityPath,
+		PageType:          layouts.PageTypeMarkdown,
+		ShowHeader:        true,
+		HideHeaderBelowMd: strings.HasPrefix(applet.IdentityPath, "thoughts/"),
+		UserEmail:         userEmail,
 	}
 	if strings.HasPrefix(applet.IdentityPath, "thoughts/") {
 		state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
-			UserEmail: userEmail,
+			UserEmail:     userEmail,
 			ViewportClass: workbench.ResolveViewportClass(c.Request().Header, c.Request().UserAgent()),
-			Threads: EmptyRegion("Threads will appear here."),
-			Chat: EmptyRegion("Chat will appear here."),
-			Artifact: ThoughtsAppletArtifactPane(applet, process, commentUI),
-			Comments: commentsPanel,
-			ArtifactOpen: true,
-			CommentsOpen: workbench.CommentsOpenFromRequest(c.Request()),
+			Threads:       EmptyRegion("Threads will appear here."),
+			Chat:          EmptyRegion("Chat will appear here."),
+			Artifact:      ThoughtsAppletArtifactPane(applet, process, commentUI),
+			Comments:      commentsPanel,
+			ArtifactOpen:  true,
+			CommentsOpen:  workbench.CommentsOpenFromRequest(c.Request()),
 		})
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		return layouts.Root(rootArgs).Render(templ.WithChildren(c.Request().Context(), workbench.Workbench(state)), c.Response().Writer)
 	}
 	state, err := BuildAppletWorkbenchState(AppletWorkbenchInput{
 		UserEmail: userEmail, Context: applet, Process: process, CommentUI: commentUI,
-		Sidebar: workbench.WorkbenchSidebarArgs{Tabs: workbench.DefaultSidebarTabs(), Files: workbench.FilesPanelModel{CurrentPath: applet.IdentityPath}, Workspaces: workbench.WorkspacesPanelModel{EmptyLabel: "Workspaces will appear here."}},
+		Sidebar:   workbench.WorkbenchSidebarArgs{Tabs: workbench.DefaultSidebarTabs(), Files: workbench.FilesPanelModel{CurrentPath: applet.IdentityPath}, Workspaces: workbench.WorkspacesPanelModel{EmptyLabel: "Workspaces will appear here."}},
 		RightRail: workbench.RightRailArgs{Chat: EmptyRegion("Chat will appear here."), Comments: commentsPanel},
 	})
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	return layouts.Root(rootArgs).Render(templ.WithChildren(c.Request().Context(), workbench.Workbench(state)), c.Response().Writer)
 }
 
@@ -315,7 +320,9 @@ func (s *Service) HandleAppletStatus(c echo.Context) error {
 			lastStatus = process.Status
 		}
 		if process.Status == appletruntime.ProcessStatusHealthy {
-			if strings.HasPrefix(applet.IdentityPath, "thoughts/") { return nil }
+			if strings.HasPrefix(applet.IdentityPath, "thoughts/") {
+				return nil
+			}
 			return sse.ExecuteScript("window.location.reload();")
 		}
 		select {
