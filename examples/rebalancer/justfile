@@ -1,0 +1,37 @@
+set dotenv-load := false
+
+port := env_var_or_default("PORT", "8082")
+
+build:
+  @just generate
+  @go test ./...
+  @go build -o ./.bin/server ./cmd/server
+  @just restart
+  @just health
+  @just status
+
+generate:
+  @sqlc generate
+  @templ generate
+
+restart:
+  @mkdir -p .run .bin files
+  @just stop
+  @VAMOS_APP_FILES_ROOT="${VAMOS_APP_FILES_ROOT:-./files}" PORT="${PORT:-{{port}}}" nohup ./.bin/server > .run/server.log 2>&1 & echo $! > .run/server.pid
+  @for attempt in $(seq 1 300); do response="$(curl -fsS "http://127.0.0.1:${PORT:-{{port}}}/healthz" 2>/dev/null || true)"; if [ "$response" = "ok" ]; then exit 0; fi; sleep 0.1; done; tail -40 .run/server.log >&2; exit 1
+
+stop:
+  @if [ -f .run/server.pid ]; then kill "$(cat .run/server.pid)" 2>/dev/null || true; rm -f .run/server.pid; fi
+  @sleep 0.2
+
+health:
+  @curl -fsS "http://127.0.0.1:${PORT:-{{port}}}/healthz"
+
+status:
+  @mkdir -p .run
+  @health="$(curl -fsS http://127.0.0.1:${PORT:-{{port}}}/healthz 2>/dev/null || echo down)"; \
+    printf '{"port":"%s","health":"%s","pid":"%s"}\n' "${PORT:-{{port}}}" "$health" "$(cat .run/server.pid 2>/dev/null || true)" | tee .run/status.json
+  @tail -12 .run/server.log 2>/dev/null || true
+
+logs:
+  @tail -f .run/server.log

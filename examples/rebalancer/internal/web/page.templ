@@ -1,0 +1,802 @@
+package web
+
+templ Layout(data PageData) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>Portfolio Rebalancer</title>
+			<script type="module" src="https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"></script>
+			<script src="static/shared/vamos-applet-ptr.js"></script>
+			<script>
+				// Theme system: match DatastarUI/shadcn with class="dark"
+				(function() {
+					const root = document.documentElement;
+					const media = window.matchMedia('(prefers-color-scheme: dark)');
+					
+					function applyTheme(theme) {
+						if (theme === 'system') {
+							root.classList.toggle('dark', media.matches);
+						} else {
+							root.classList.toggle('dark', theme === 'dark');
+						}
+					}
+					
+					function setTheme(theme) {
+						localStorage.setItem('theme', theme);
+						applyTheme(theme);
+					}
+					
+					// Initialize from localStorage or system
+					const saved = localStorage.getItem('theme');
+					if (saved && ['light', 'dark', 'system'].includes(saved)) {
+						applyTheme(saved);
+					} else {
+						setTheme('system');
+					}
+					
+					// Listen for system preference changes when theme=system
+					media.addEventListener('change', () => {
+						const current = localStorage.getItem('theme');
+						if (!current || current === 'system') {
+							applyTheme('system');
+						}
+					});
+					
+					// Listen for parent theme messages (Vamos embed)
+					window.addEventListener('message', e => {
+						if (e.data === 'dark' || e.data === 'light') {
+							setTheme(e.data);
+						}
+					});
+					
+					window.toggleTheme = function() {
+						const current = localStorage.getItem('theme') || 'system';
+						const isDark = root.classList.contains('dark');
+						setTheme(isDark ? 'light' : 'dark');
+					};
+				})();
+			</script>
+			<style>
+				:root {
+					--background: 255 255 255;
+					--foreground: 0 0 0;
+					--card: 255 255 255;
+					--card-foreground: 0 0 0;
+					--muted: 248 249 250;
+					--muted-foreground: 108 117 125;
+					--border: 222 226 230;
+					--accent: 0 166 81;
+					--accent-foreground: 255 255 255;
+					--destructive: 211 47 47;
+					--destructive-foreground: 255 255 255;
+				}
+				
+				.dark {
+					--background: 0 0 0;
+					--foreground: 255 255 255;
+					--card: 26 26 26;
+					--card-foreground: 255 255 255;
+					--muted: 45 45 45;
+					--muted-foreground: 176 176 176;
+					--border: 58 58 58;
+					--accent: 0 214 98;
+					--accent-foreground: 0 0 0;
+					--destructive: 255 82 82;
+					--destructive-foreground: 255 255 255;
+				}
+				
+				* {
+					margin: 0;
+					padding: 0;
+					box-sizing: border-box;
+				}
+				
+				body {
+					font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+					background: rgb(var(--background));
+					color: rgb(var(--foreground));
+					line-height: 1.5;
+					overscroll-behavior-y: contain;
+				}
+				
+				.container {
+					max-width: 960px;
+					margin: 0 auto;
+				}
+				
+				.header {
+					background: rgb(var(--card));
+					border-bottom: 1px solid rgb(var(--border));
+					padding: 16px;
+					display: flex;
+					justify-content: space-between;
+					align-items: center;
+					position: sticky;
+					top: 0;
+					z-index: 100;
+				}
+				
+				.header-title {
+					font-size: 18px;
+					font-weight: 600;
+				}
+				
+				.theme-toggle {
+					background: none;
+					border: none;
+					color: rgb(var(--foreground));
+					font-size: 20px;
+					cursor: pointer;
+					padding: 8px;
+					border-radius: 8px;
+					transition: background 0.2s;
+				}
+				
+				.theme-toggle:hover {
+					background: rgb(var(--muted));
+				}
+				
+				.header-controls {
+					display: flex;
+					gap: 8px;
+					align-items: center;
+				}
+				
+				.refresh-button {
+					background: none;
+					border: none;
+					color: rgb(var(--foreground));
+					font-size: 20px;
+					cursor: pointer;
+					padding: 8px;
+					border-radius: 8px;
+					transition: background 0.2s;
+				}
+				
+				.refresh-button:hover {
+					background: rgb(var(--muted));
+				}
+				
+				.card {
+					background: rgb(var(--card));
+					border: 1px solid rgb(var(--border));
+					border-radius: 8px;
+					margin: 16px;
+					overflow: hidden;
+				}
+				
+				.card-header {
+					padding: 16px;
+					border-bottom: 1px solid rgb(var(--border));
+					font-weight: 600;
+					font-size: 16px;
+					background: rgb(var(--muted));
+					position: sticky;
+					top: 57px;
+					z-index: 10;
+				}
+				
+				.card-body {
+					padding: 16px;
+				}
+				
+				.search-controls {
+					display: flex;
+					gap: 12px;
+					padding: 12px 16px;
+					background: rgb(var(--muted));
+					border-bottom: 1px solid rgb(var(--border));
+					align-items: center;
+				}
+				
+				.search-input {
+					flex: 1;
+					padding: 10px 12px;
+					background: rgb(var(--background));
+					border: 1px solid rgb(var(--border));
+					border-radius: 6px;
+					color: rgb(var(--foreground));
+					font-size: 14px;
+				}
+				
+				.search-input::placeholder {
+					color: rgb(var(--muted-foreground));
+				}
+				
+				.search-input:focus {
+					outline: none;
+					border-color: rgb(var(--accent));
+				}
+				
+				.sort-select {
+					padding: 10px 12px;
+					background: rgb(var(--background));
+					border: 1px solid rgb(var(--border));
+					border-radius: 6px;
+					color: rgb(var(--foreground));
+					font-size: 14px;
+					cursor: pointer;
+					min-width: 120px;
+				}
+				
+				.list-container {
+					max-height: 600px;
+					overflow-y: auto;
+				}
+				
+				.list-row {
+					display: flex;
+					justify-content: space-between;
+					align-items: center;
+					padding: 12px 16px;
+					border-bottom: 1px solid rgb(var(--border));
+					transition: background 0.1s;
+				}
+				
+				.list-row:hover {
+					background: rgb(var(--muted) / 0.5);
+				}
+				
+				.list-row:last-child {
+					border-bottom: none;
+				}
+				
+				.list-left {
+					flex: 1;
+					min-width: 0;
+				}
+				
+				.list-symbol {
+					font-weight: 700;
+					font-size: 16px;
+					margin-bottom: 2px;
+					color: rgb(var(--foreground));
+				}
+				
+				.list-detail {
+					font-size: 13px;
+					color: rgb(var(--muted-foreground));
+					margin-bottom: 2px;
+				}
+				
+				.list-account {
+					font-size: 11px;
+					color: rgb(var(--muted-foreground));
+				}
+				
+				.list-right {
+					text-align: right;
+					margin-left: 16px;
+				}
+				
+				.list-value {
+					font-size: 16px;
+					font-weight: 600;
+					color: rgb(var(--foreground));
+				}
+				
+				.table-container {
+					overflow-x: auto;
+				}
+				
+				.table {
+					width: 100%;
+					border-collapse: collapse;
+					font-size: 14px;
+				}
+				
+				.table thead {
+					background: rgb(var(--muted));
+					position: sticky;
+					top: 73px;
+					z-index: 9;
+				}
+				
+				.table th {
+					padding: 12px 16px;
+					text-align: left;
+					font-weight: 600;
+					font-size: 12px;
+					text-transform: uppercase;
+					letter-spacing: 0.5px;
+					color: rgb(var(--muted-foreground));
+					border-bottom: 1px solid rgb(var(--border));
+				}
+				
+				.table th.text-right {
+					text-align: right;
+				}
+				
+				.table td {
+					padding: 12px 16px;
+					border-bottom: 1px solid rgb(var(--border));
+				}
+				
+				.table td.text-right {
+					text-align: right;
+				}
+				
+				.table td.muted {
+					color: rgb(var(--muted-foreground));
+				}
+				
+				.table tbody tr:nth-child(even) {
+					background: rgb(var(--muted) / 0.3);
+				}
+				
+				.table tbody tr:hover {
+					background: rgb(var(--muted) / 0.6);
+				}
+				
+				.symbol {
+					font-weight: 600;
+				}
+				
+				.account-badge {
+					display: inline-block;
+					font-size: 11px;
+					padding: 2px 8px;
+					border-radius: 10px;
+					background: rgb(var(--muted));
+					color: rgb(var(--muted-foreground));
+					font-weight: 500;
+					margin-left: 6px;
+				}
+				
+				.pill {
+					font-size: 11px;
+					padding: 3px 8px;
+					border-radius: 10px;
+					font-weight: 600;
+					white-space: nowrap;
+				}
+				
+				.pill-buy {
+					background: rgb(var(--accent) / 0.15);
+					color: rgb(var(--accent));
+				}
+				
+				.pill-sell {
+					background: rgb(var(--destructive) / 0.15);
+					color: rgb(var(--destructive));
+				}
+				
+				.btn {
+					background: rgb(var(--accent));
+					color: rgb(var(--accent-foreground));
+					border: none;
+					padding: 12px 24px;
+					border-radius: 8px;
+					font-weight: 600;
+					font-size: 15px;
+					cursor: pointer;
+					transition: opacity 0.2s;
+					width: 100%;
+				}
+				
+				.btn:hover {
+					opacity: 0.9;
+				}
+				
+				.btn:active {
+					opacity: 0.8;
+				}
+				
+				.input-group {
+					margin-bottom: 12px;
+				}
+				
+				.input-label {
+					display: block;
+					font-size: 13px;
+					color: rgb(var(--muted-foreground));
+					margin-bottom: 4px;
+					font-weight: 500;
+				}
+				
+				.input {
+					width: 100%;
+					padding: 10px 12px;
+					background: rgb(var(--background));
+					border: 1px solid rgb(var(--border));
+					border-radius: 6px;
+					color: rgb(var(--foreground));
+					font-size: 15px;
+				}
+				
+				.input:focus {
+					outline: none;
+					border-color: rgb(var(--accent));
+				}
+				
+				.select {
+					padding: 8px 12px;
+					background: rgb(var(--background));
+					border: 1px solid rgb(var(--border));
+					border-radius: 6px;
+					color: rgb(var(--foreground));
+					font-size: 14px;
+					cursor: pointer;
+				}
+				
+				.grid {
+					display: grid;
+					grid-template-columns: repeat(2, 1fr);
+					gap: 12px;
+				}
+				
+				@media (min-width: 640px) {
+					.grid {
+						grid-template-columns: repeat(3, 1fr);
+					}
+				}
+				
+				.summary-item {
+					display: flex;
+					flex-direction: column;
+					gap: 4px;
+				}
+				
+				.summary-label {
+					font-size: 12px;
+					color: rgb(var(--muted-foreground));
+					text-transform: uppercase;
+					letter-spacing: 0.5px;
+				}
+				
+				.summary-value {
+					font-size: 20px;
+					font-weight: 700;
+				}
+				
+				.summary-target {
+					font-size: 11px;
+					color: rgb(var(--muted-foreground));
+				}
+				
+				.alert {
+					padding: 12px 16px;
+					border-radius: 8px;
+					margin: 16px;
+				}
+				
+				.alert-success {
+					background: rgb(var(--accent) / 0.15);
+					color: rgb(var(--accent));
+					border: 1px solid rgb(var(--accent));
+				}
+				
+				.alert-error {
+					background: rgb(var(--destructive) / 0.15);
+					color: rgb(var(--destructive));
+					border: 1px solid rgb(var(--destructive));
+				}
+				
+				.alert-warning {
+					background: rgb(255 243 205 / 0.15);
+					color: #856404;
+					border: 1px solid #ffc107;
+				}
+				
+				.dark .alert-warning {
+					background: rgb(51 39 1 / 0.3);
+					color: #ffc107;
+				}
+				
+				.constraint-list {
+					list-style: none;
+					font-size: 13px;
+					line-height: 1.6;
+				}
+				
+				.constraint-list li:before {
+					content: "• ";
+					color: rgb(var(--muted-foreground));
+				}
+				
+				.controls-row {
+					display: flex;
+					gap: 12px;
+					padding: 12px 16px;
+					background: rgb(var(--muted));
+					border-bottom: 1px solid rgb(var(--border));
+				}
+				
+				.controls-row select {
+					flex: 1;
+				}
+				
+				.empty-state {
+					text-align: center;
+					color: rgb(var(--muted-foreground));
+					padding: 32px 16px;
+				}
+			</style>
+		</head>
+		<body>
+			<div class="header">
+				<div class="header-title">Portfolio Rebalancer</div>
+				<div class="header-controls">
+					<button class="refresh-button" onclick="(window.VamosApplet && window.VamosApplet.requestRefresh ? window.VamosApplet.requestRefresh() : location.reload())" title="Refresh" aria-label="Refresh">
+						<span>↻</span>
+					</button>
+					<button class="theme-toggle" onclick="window.toggleTheme()" title="Toggle theme">
+						<span id="theme-icon">◐</span>
+					</button>
+				</div>
+			</div>
+			<main data-init="@get('/events')">
+				<div id="ingest-status"></div>
+				@MainContent(data)
+			</main>
+			<script>
+				// Update theme icon
+				function updateThemeIcon() {
+					const isDark = document.documentElement.classList.contains('dark');
+					document.getElementById('theme-icon').textContent = isDark ? '☀' : '🌙';
+				}
+				updateThemeIcon();
+				new MutationObserver(updateThemeIcon).observe(
+					document.documentElement,
+					{ attributes: true, attributeFilter: ['class'] }
+				);
+			</script>
+		</body>
+	</html>
+}
+
+templ MainContent(data PageData) {
+	<div id="rebalancer-main">
+		<!-- Controls Card -->
+		<div class="card">
+			<div class="card-body">
+				<button
+					class="btn"
+					data-on:click="@post('/ingest', {contentType: 'form'})"
+				>
+					Load Positions
+				</button>
+			</div>
+		</div>
+		<!-- Targets Card -->
+		@Targets(data)
+		<!-- Summary Card -->
+		@Summary(data)
+		<!-- Positions Card -->
+		@Positions(data)
+		<!-- Trades Card -->
+		@Trades(data)
+	</div>
+}
+
+templ IngestStatus(status, message string) {
+	<div id="ingest-status">
+		if status != "" {
+			<div class={ "alert", templ.KV("alert-success", status == "success"), templ.KV("alert-error", status == "error") }>
+				{ message }
+			</div>
+		}
+	</div>
+}
+
+templ Targets(data PageData) {
+	<div id="targets" class="card">
+		<div class="card-header">Target Allocation</div>
+		<div class="card-body">
+			<form>
+				<div class="grid">
+					<div class="input-group">
+						<label class="input-label">US Equity (%)</label>
+						<input
+							type="number"
+							name="wUs"
+							min="0"
+							max="100"
+							step="1"
+							value={ formatFloat(data.Targets.USEquity) }
+							data-model="wUs"
+							data-on:input.debounce_500ms="@post('/rebalance', {contentType: 'form'})"
+							class="input"
+						/>
+					</div>
+					<div class="input-group">
+						<label class="input-label">Intl Equity (%)</label>
+						<input
+							type="number"
+							name="wIntl"
+							min="0"
+							max="100"
+							step="1"
+							value={ formatFloat(data.Targets.IntlEquity) }
+							data-model="wIntl"
+							data-on:input.debounce_500ms="@post('/rebalance', {contentType: 'form'})"
+							class="input"
+						/>
+					</div>
+					<div class="input-group">
+						<label class="input-label">Thematic Equity (%)</label>
+						<input
+							type="number"
+							name="wThematic"
+							min="0"
+							max="100"
+							step="1"
+							value={ formatFloat(data.Targets.ThematicEquity) }
+							data-model="wThematic"
+							data-on:input.debounce_500ms="@post('/rebalance', {contentType: 'form'})"
+							class="input"
+						/>
+					</div>
+					<div class="input-group">
+						<label class="input-label">Gold (%)</label>
+						<input
+							type="number"
+							name="wGold"
+							min="0"
+							max="100"
+							step="1"
+							value={ formatFloat(data.Targets.Gold) }
+							data-model="wGold"
+							data-on:input.debounce_500ms="@post('/rebalance', {contentType: 'form'})"
+							class="input"
+						/>
+					</div>
+					<div class="input-group">
+						<label class="input-label">Short Duration (%)</label>
+						<input
+							type="number"
+							name="wShort"
+							min="0"
+							max="100"
+							step="1"
+							value={ formatFloat(data.Targets.ShortDuration) }
+							data-model="wShort"
+							data-on:input.debounce_500ms="@post('/rebalance', {contentType: 'form'})"
+							class="input"
+						/>
+					</div>
+					<div class="input-group">
+						<label class="input-label">Cash (%)</label>
+						<input
+							type="number"
+							name="wCash"
+							min="0"
+							max="100"
+							step="1"
+							value={ formatFloat(data.Targets.Cash) }
+							data-model="wCash"
+							data-on:input.debounce_500ms="@post('/rebalance', {contentType: 'form'})"
+							class="input"
+						/>
+					</div>
+				</div>
+			</form>
+		</div>
+	</div>
+}
+
+templ Summary(data PageData) {
+	<div id="summary" class="card">
+		<div class="card-header">Portfolio Mix</div>
+		<div class="card-body">
+			<div class="grid">
+				<div class="summary-item">
+					<div class="summary-label">Total Value</div>
+					<div class="summary-value">{ "$" + formatMoney(data.TotalValue) }</div>
+				</div>
+				if len(data.ClassBreakdown) > 0 {
+					for _, cb := range data.ClassBreakdown {
+						<div class="summary-item">
+							<div class="summary-label">{ cb.Class }</div>
+							<div class="summary-value">{ formatFloat(cb.CurrentPct) }%</div>
+							if cb.TargetPct > 0 {
+								<div class="summary-target">Target: { formatFloat(cb.TargetPct) }%</div>
+							}
+						</div>
+					}
+				}
+			</div>
+			if len(data.Blockers) > 0 {
+				<div class="alert alert-warning" style="margin-top: 16px;">
+					<div style="font-weight: 600; margin-bottom: 8px;">Constraints</div>
+					<ul class="constraint-list">
+						for _, b := range data.Blockers {
+							<li>{ b }</li>
+						}
+					</ul>
+				</div>
+			}
+		</div>
+	</div>
+}
+
+templ Positions(data PageData) {
+	<div id="positions" class="card">
+		<div class="card-header">Positions</div>
+		<div class="search-controls">
+			<input
+				type="text"
+				placeholder="Search 57 positions"
+				class="search-input"
+				data-model="searchQuery"
+				data-on:input.debounce_300ms="@post('/positions', {contentType: 'form'})"
+			/>
+			<select
+				name="sortBy"
+				data-model="sortBy"
+				data-on:change="@post('/positions', {contentType: 'form'})"
+				class="sort-select"
+			>
+				<option value="value" selected?={ data.SortBy == "value" }>Last price</option>
+				<option value="symbol" selected?={ data.SortBy == "symbol" }>Symbol</option>
+				<option value="account" selected?={ data.SortBy == "account" }>Account</option>
+			</select>
+		</div>
+		if len(data.Positions) == 0 {
+			<div class="empty-state">
+				No positions loaded. Click "Load Positions" to start.
+			</div>
+		} else {
+			<div class="list-container">
+				for _, p := range data.Positions {
+					<div class="list-row">
+						<div class="list-left">
+							<div class="list-symbol">{ p.Symbol }</div>
+							<div class="list-detail">
+								{ formatFloat(p.Quantity) + " @ $" + formatMoney(p.Price) }
+							</div>
+							<div class="list-account">{ p.Account }</div>
+						</div>
+						<div class="list-right">
+							<div class="list-value">{ "$" + formatMoney(p.MarketValue) }</div>
+						</div>
+					</div>
+				}
+			</div>
+		}
+	</div>
+}
+
+templ Trades(data PageData) {
+	<div id="trades" class="card">
+		<div class="card-header">Proposed Trades</div>
+		if len(data.Trades) == 0 {
+			<div class="empty-state">
+				No trades proposed. Adjust target allocation to generate trades.
+			</div>
+		} else {
+			<div class="table-container">
+				<table class="table">
+					<thead>
+						<tr>
+							<th>Account</th>
+							<th>Side</th>
+							<th>Symbol</th>
+							<th class="text-right">Shares</th>
+							<th class="text-right">Dollars</th>
+							<th class="muted">Reason</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, t := range data.Trades {
+							<tr>
+								<td class="muted">{ t.Account }</td>
+								<td>
+									<span class={ "pill", templ.KV("pill-buy", t.Side == "BUY"), templ.KV("pill-sell", t.Side == "SELL") }>
+										{ t.Side }
+									</span>
+								</td>
+								<td class="symbol">{ t.Symbol }</td>
+								<td class="text-right">{ formatInt(t.RoundedShares) }</td>
+								<td class="text-right">{ "$" + formatMoney(t.Dollars) }</td>
+								<td class="muted">{ t.Reason }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	</div>
+}

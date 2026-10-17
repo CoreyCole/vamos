@@ -1,0 +1,5 @@
+.run/
+.bin/
+files/
+internal/web/*_templ.go
+internal/db/dbgen/
