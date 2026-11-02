@@ -2,6 +2,8 @@
 
 Examples are small, long-running applets that demonstrate Vamos app patterns. Keep them portable, easy to run locally, and safe for non-technical users to modify through chat.
 
+Do **not** add new demos on the old Files/Chat `/examples` workbench. Put new applets in Thoughts using the `e2e-*` / Guitar Hero pattern. Existing `/examples/:id` routes are compatibility only until each demo is migrated or deliberately kept.
+
 ## UI and interaction pattern
 
 - For Datastar/Go examples, use the Datastar CQRS pattern:

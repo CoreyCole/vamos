@@ -52,6 +52,8 @@ Thoughts applets use the canonical manifest artifact path as durable identity. O
 
 Examples use the same route semantics but live in repo-tracked sample directories such as `examples/wordle/AGENTS.md`. Their stable compatibility route remains `/examples/:id`.
 
+Do **not** add new demos on the old Files/Chat `/examples` workbench. New applets belong under Thoughts (`e2e-*` / Guitar Hero pattern). Existing `/examples/:id` routes stay as compatibility until each demo is migrated or deliberately kept.
+
 ## Standalone app rule
 
 App code should stay standalone. It may keep root-relative routes such as `/events`, `/guesses`, or `/_stcore/stream`. The manifest declares which root paths belong to the applet so Vamos can forward those requests while the app is embedded.

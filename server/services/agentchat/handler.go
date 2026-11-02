@@ -28,7 +28,6 @@ import (
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 	serverauth "github.com/CoreyCole/vamos/server/services/auth"
 	"github.com/CoreyCole/vamos/server/services/commentui"
-	"github.com/CoreyCole/vamos/server/services/docs"
 	"github.com/CoreyCole/vamos/server/services/layoutprefs"
 	"github.com/CoreyCole/vamos/server/services/markdown"
 	"github.com/CoreyCole/vamos/server/services/theme"
@@ -139,14 +138,6 @@ func (h *Handler) WithLayoutPreferenceService(service *layoutprefs.Service) *Han
 	return h
 }
 
-func (h *Handler) RegisterRoutes(g *echo.Group) {
-	g.GET("", h.HandleAgentChatIndex)
-	g.GET("/thoughts/*", h.HandleThoughtsDoc)
-	g.GET("/:workspace_id", h.HandleWorkspacePage)
-	g.GET("/:workspace_id/thread/:thread_id", h.HandleWorkspacePage)
-	h.RegisterRuntimeRoutes(g)
-}
-
 func (h *Handler) RegisterNotFoundPageRoutes(g *echo.Group) {
 	g.GET("", h.notFoundAgentChatPage)
 	g.GET("/", h.notFoundAgentChatPage)
@@ -242,14 +233,6 @@ func (h *Handler) RegisterRuntimeRoutes(g *echo.Group) {
 	g.POST("/send", h.SendPrompt)
 	g.POST("/cwd", h.ChangeCwd)
 	g.POST("/docs/select", h.SelectDoc)
-}
-
-func (h *Handler) HandleThoughtsDoc(c echo.Context) error {
-	docPath, err := docs.ParseThoughtsDocPath("agent-chat/thoughts", c.Param("*"))
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	return c.Redirect(http.StatusFound, docs.ThoughtsDocHref(docPath))
 }
 
 func (h *Handler) redirectToThoughtsDoc(c echo.Context, docPath string) error {
@@ -371,55 +354,6 @@ func (h *Handler) OpenDocumentChat(c echo.Context) error {
 	)
 }
 
-func (h *Handler) HandleAgentChatIndex(c echo.Context) error {
-	userEmail, ok := c.Get("user_email").(string)
-	if !ok || userEmail == "" {
-		return c.Redirect(http.StatusFound, "/login")
-	}
-
-	return h.HandleChatPage(c)
-}
-
-func (h *Handler) HandleChatPage(c echo.Context) error {
-	userEmail, ok := c.Get("user_email").(string)
-	if !ok || userEmail == "" {
-		return c.Redirect(http.StatusFound, "/login")
-	}
-
-	args, err := h.service.BuildPageArgs(
-		c.Request().Context(),
-		userEmail,
-		c.QueryParam("thread"),
-		c.QueryParam("run"),
-		c.QueryParam("doc"),
-		c.QueryParam("cwd"),
-	)
-	if err != nil {
-		if isRecoverableThreadWorkspaceMismatch(err) {
-			h.logRecoverableThreadWorkspaceMismatch(c, err)
-			return c.Redirect(http.StatusSeeOther, "/")
-		}
-		return echo.NewHTTPError(http.StatusNotFound, err.Error())
-	}
-
-	currentTheme := "dark"
-	currentSyntaxTheme := ""
-	if h.themeService != nil {
-		currentTheme = h.themeService.GetCurrentThemeMode(c)
-		currentSyntaxTheme = h.themeService.GetCurrentTheme(c)
-	}
-
-	args.UserEmail = userEmail
-	args.CurrentTheme = currentTheme
-	args.CurrentSyntaxTheme = currentSyntaxTheme
-	workbenchState, err := h.buildFreeformWorkbenchState(c, *args)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	args.Workbench = workbenchState
-	return ChatPage(*args).Render(c.Request().Context(), c.Response().Writer)
-}
-
 func isRecoverableThreadWorkspaceMismatch(err error) bool {
 	return errors.Is(err, ErrThreadWorkspaceMismatch)
 }
@@ -437,34 +371,6 @@ func (h *Handler) logRecoverableThreadWorkspaceMismatch(c echo.Context, err erro
 		c.Request().URL.Path,
 		c.Request().URL.RawQuery,
 		err.Error(),
-	)
-}
-
-func (h *Handler) buildFreeformWorkbenchState(
-	c echo.Context,
-	args ChatPageArgs,
-) (workbench.WorkbenchState, error) {
-	var saved *workbench.WorkbenchConfig
-	viewportClass := workbench.ResolveViewportClass(
-		c.Request().Header,
-		c.Request().UserAgent(),
-	)
-	if h.layoutPrefs != nil {
-		cfg := h.layoutPrefs.GetOrDefault(
-			c.Request().Context(),
-			args.UserEmail,
-			workbench.WorkbenchPageAgentChat,
-			workbench.WorkbenchViewFocus,
-			"",
-			viewportClass,
-		)
-		saved = &cfg
-	}
-	return buildFreeformWorkbenchState(
-		args,
-		saved,
-		c.Request().URL.RequestURI(),
-		viewportClass,
 	)
 }
 

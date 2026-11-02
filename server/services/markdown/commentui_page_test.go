@@ -58,9 +58,30 @@ func TestMarkdownPageUsesSharedCommentUI(t *testing.T) {
 			Attached:     true,
 		},
 	}
+	state, err := workbench.BuildWorkbenchState(workbench.BuildWorkbenchStateInput{
+		UserEmail:  args.UserEmail,
+		Page:       workbench.WorkbenchPageThoughts,
+		View:       workbench.WorkbenchViewFocus,
+		ActivePath: args.FilePath,
+		Regions: []workbench.WorkbenchRegion{
+			{
+				ID:        "thoughts-document",
+				Slot:      workbench.WorkbenchSlotPrimary,
+				Kind:      workbench.RegionDocument,
+				Visible:   true,
+				TargetID:  "thoughts-document-region",
+				Component: DocumentPanel(BuildDocumentPanelArgs(args)),
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("BuildWorkbenchState() error = %v", err)
+	}
 
 	var buf bytes.Buffer
-	if err := MarkdownPage(args).Render(t.Context(), &buf); err != nil {
+	if err := MarkdownWorkbenchPage(
+		MarkdownWorkbenchArgs{PageArgs: args, Workbench: state},
+	).Render(t.Context(), &buf); err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
 	html := buf.String()
@@ -71,13 +92,11 @@ func TestMarkdownPageUsesSharedCommentUI(t *testing.T) {
 		`comment_selection-inline-comment-trigger`,
 		`name="selected_text"`,
 		`id="document-surface"`,
-		`thoughts-open-chat-result`,
 		`id="workbench-root"`,
-		`id="thoughts-section-map-region"`,
 		`id="thoughts-document-region"`,
 	} {
 		if !strings.Contains(html, want) {
-			t.Fatalf("MarkdownPage render missing %q in %s", want, html)
+			t.Fatalf("MarkdownWorkbenchPage render missing %q in %s", want, html)
 		}
 	}
 	for _, removed := range []string{
@@ -99,7 +118,7 @@ func TestMarkdownPageUsesSharedCommentUI(t *testing.T) {
 	} {
 		if strings.Contains(html, removed) {
 			t.Fatalf(
-				"MarkdownPage render kept removed discussions chrome %q: %s",
+				"MarkdownWorkbenchPage render kept removed discussions chrome %q: %s",
 				removed,
 				html,
 			)
@@ -138,14 +157,6 @@ func TestMarkdownWorkbenchContextClosedByDefaultAndCommentsOpen(t *testing.T) {
 			ContextMode: contextMode,
 			ActivePath:  args.FilePath,
 			Regions: []workbench.WorkbenchRegion{
-				{
-					ID:        "thoughts-sections",
-					Slot:      workbench.WorkbenchSlotNavigation,
-					Kind:      workbench.RegionSections,
-					Visible:   true,
-					TargetID:  "thoughts-section-map-region",
-					Component: SectionMapPanel(BuildSectionMapArgs(args)),
-				},
 				{
 					ID:        "thoughts-document",
 					Slot:      workbench.WorkbenchSlotPrimary,
@@ -242,7 +253,9 @@ func TestMarkdownPageHidesWorkspaceOwnershipText(t *testing.T) {
 			}
 
 			var buf bytes.Buffer
-			if err := MarkdownPage(args).Render(t.Context(), &buf); err != nil {
+			if err := DocumentPanel(
+				BuildDocumentPanelArgs(args),
+			).Render(t.Context(), &buf); err != nil {
 				t.Fatalf("Render() error = %v", err)
 			}
 			html := buf.String()
@@ -254,7 +267,7 @@ func TestMarkdownPageHidesWorkspaceOwnershipText(t *testing.T) {
 			} {
 				if strings.Contains(html, removed) {
 					t.Fatalf(
-						"MarkdownPage render kept ownership text %q: %s",
+						"DocumentPanel render kept ownership text %q: %s",
 						removed,
 						html,
 					)
@@ -280,19 +293,6 @@ func TestDirectoryWorkbenchPageRendersSharedSidebarAndDirectoryAnchors(t *testin
 				Path: "creative-mode-agent/plans/plan-a/design.md",
 			},
 		},
-		FileTree: []FileTreeNode{
-			{
-				Name:       "thoughts",
-				Path:       "thoughts",
-				IsDir:      true,
-				IsExpanded: true,
-				Children: []FileTreeNode{{
-					Name:     "design.md",
-					Path:     "thoughts/creative-mode-agent/plans/plan-a/design.md",
-					IsActive: true,
-				}},
-			},
-		},
 	}
 	state, err := workbench.BuildWorkbenchState(workbench.BuildWorkbenchStateInput{
 		UserEmail:  args.UserEmail,
@@ -301,16 +301,6 @@ func TestDirectoryWorkbenchPageRendersSharedSidebarAndDirectoryAnchors(t *testin
 		ActivePath: args.Path,
 		Regions: []workbench.WorkbenchRegion{
 			{
-				ID:       "thoughts-sections",
-				Slot:     workbench.WorkbenchSlotNavigation,
-				Kind:     workbench.RegionThoughtsTree,
-				Visible:  true,
-				TargetID: "thoughts-sidebar-region",
-				Component: workbench.SharedSidebar(
-					BuildThoughtsDirectorySidebarArgs(args),
-				),
-			},
-			{
 				ID:        "thoughts-document",
 				Slot:      workbench.WorkbenchSlotPrimary,
 				Kind:      workbench.RegionDocument,
@@ -318,16 +308,7 @@ func TestDirectoryWorkbenchPageRendersSharedSidebarAndDirectoryAnchors(t *testin
 				TargetID:  "thoughts-directory-region",
 				Component: DirectoryPrimaryPanel(args),
 			},
-			{
-				ID:        "thoughts-context",
-				Slot:      workbench.WorkbenchSlotContext,
-				Kind:      workbench.RegionEmpty,
-				Visible:   false,
-				TargetID:  "thoughts-context-region",
-				Component: EmptyDirectoryContextPanel(),
-			},
 		},
-		NormalRegions: thoughtsNormalRegions(false),
 	})
 	if err != nil {
 		t.Fatalf("BuildWorkbenchState() error = %v", err)
@@ -342,12 +323,9 @@ func TestDirectoryWorkbenchPageRendersSharedSidebarAndDirectoryAnchors(t *testin
 	html := buf.String()
 	for _, want := range []string{
 		`id="workbench-root"`,
-		`id="thoughts-sidebar-region"`,
 		`id="thoughts-directory-region"`,
 		`id="thoughts-directory-primary"`,
 		`id="thoughts-directory-scroll-region"`,
-		`Files`,
-		`Workspaces`,
 		`href="/thoughts/creative-mode-agent/plans/plan-a"`,
 		`href="/thoughts/creative-mode-agent/plans/plan-a/design.md"`,
 	} {

@@ -76,7 +76,6 @@ type PageArgs struct {
 	CurrentTheme         string                        // "dark" or "light" - from user preferences
 	CurrentSyntaxTheme   string                        // Current syntax theme name
 	PageSessionID        string                        // Unique page session ID for this tab
-	FileTree             []FileTreeNode                // Sidebar file tree
 	WorkbenchLinkState   ThoughtsWorkbenchLinkState
 	CommentUI            commentui.CommentableMarkdownArgs
 	WorkspaceContext     DocumentWorkspaceContext
@@ -94,12 +93,6 @@ type DocumentAction struct {
 	Icon         string
 	AriaLabel    string
 	HiddenFields map[string]string
-}
-
-type SectionMapArgs struct {
-	FilePath string
-	TOC      []TocItem
-	Sections []Section
 }
 
 type MarkdownWorkbenchArgs struct {
@@ -193,10 +186,9 @@ type DirectoryArgs struct {
 	Parent             string
 	Breadcrumbs        []DirectoryBreadcrumb
 	Items              []DirectoryItem
-	UserEmail          string         // User email from auth context
-	CurrentTheme       string         // "dark" or "light" - from user preferences
-	CurrentSyntaxTheme string         // Current syntax theme name
-	FileTree           []FileTreeNode // Sidebar file tree
+	UserEmail          string // User email from auth context
+	CurrentTheme       string // "dark" or "light" - from user preferences
+	CurrentSyntaxTheme string // Current syntax theme name
 	WorkbenchLinkState ThoughtsWorkbenchLinkState
 }
 
@@ -210,16 +202,6 @@ type DirectoryItem struct {
 type DirectoryBreadcrumb struct {
 	Name string
 	Path string
-}
-
-// FileTreeNode represents a node in the file/folder tree sidebar
-type FileTreeNode struct {
-	Name       string
-	Path       string
-	IsDir      bool
-	IsExpanded bool // folder is open (along the active path)
-	IsActive   bool // this node is the currently viewed file/directory
-	Children   []FileTreeNode
 }
 
 // BuildRootArgs creates RootArgs for the layout

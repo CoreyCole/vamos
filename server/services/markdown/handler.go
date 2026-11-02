@@ -30,17 +30,7 @@ const (
 
 	thoughtsWorkspacesLimit = 200
 
-	thoughtsNavigationRatio = 0.22
-	thoughtsPrimaryRatio    = 0.56
-	thoughtsContextRatio    = 0.22
-	thoughtsNavigationMin   = 14
-	thoughtsPrimaryMin      = 28
-	thoughtsContextMin      = 18
-
-	documentWorkbenchPrimarySelectorID  = "doc-workbench-viewer-region"
-	directoryWorkbenchPrimarySelectorID = "thoughts-directory-region"
-	thoughtsSharedSidebarSelectorID     = "thoughts-shared-sidebar"
-	thoughtsURLSyncSelectorID           = "thoughts-url-sync"
+	thoughtsURLSyncSelectorID = "thoughts-url-sync"
 )
 
 // ServeMarkdown handles HTTP requests for markdown files and directories
@@ -85,7 +75,6 @@ func (s *Service) ServeMarkdown(c echo.Context) error {
 		dirArgs.UserEmail = userEmail
 		dirArgs.CurrentTheme = currentThemeMode
 		dirArgs.CurrentSyntaxTheme = currentTheme
-		dirArgs.FileTree = s.GetFileTree(requestPath)
 		dirArgs.WorkbenchLinkState = ThoughtsWorkbenchLinkStateFromRequest(
 			c,
 			selectedPlanPathFromThoughtsPath(dirArgs.Path),
@@ -119,7 +108,6 @@ func (s *Service) ServeMarkdown(c echo.Context) error {
 				dirArgs.UserEmail = userEmail
 				dirArgs.CurrentTheme = currentThemeMode
 				dirArgs.CurrentSyntaxTheme = currentTheme
-				dirArgs.FileTree = s.GetFileTree(requestPath)
 				dirArgs.WorkbenchLinkState = ThoughtsWorkbenchLinkStateFromRequest(
 					c,
 					selectedPlanPathFromThoughtsPath(dirArgs.Path),
@@ -157,7 +145,6 @@ func (s *Service) ServeMarkdown(c echo.Context) error {
 	pageArgs.UserEmail = userEmail
 	pageArgs.CurrentTheme = currentThemeMode
 	pageArgs.CurrentSyntaxTheme = currentTheme
-	pageArgs.FileTree = s.GetFileTree(pageArgs.FilePath)
 	pageArgs.WorkbenchLinkState = ThoughtsWorkbenchLinkStateFromRequest(
 		c,
 		selectedPlanPathFromThoughtsPath(pageArgs.FilePath),
@@ -684,24 +671,8 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 	)
 }
 
-func thoughtsNormalRegions(contextVisible bool) []workbench.RegionNormalState {
-	return []workbench.RegionNormalState{
-		{SignalKey: "thoughts-sections", Available: true, Visible: true},
-		{SignalKey: "thoughts-document", Available: true, Visible: true},
-		{SignalKey: "thoughts-context", Available: true, Visible: contextVisible},
-	}
-}
-
 func BuildDocumentPanelArgs(pageArgs *PageArgs) DocumentPanelArgs {
 	return DocumentPanelArgs{Document: BuildThoughtsDocument(pageArgs)}
-}
-
-func BuildSectionMapArgs(pageArgs *PageArgs) SectionMapArgs {
-	return SectionMapArgs{
-		FilePath: pageArgs.FilePath,
-		TOC:      pageArgs.TableOfContents,
-		Sections: pageArgs.ViewerArgs.Sections,
-	}
 }
 
 func (s *Service) HandleSelectComment(c echo.Context) error {
@@ -813,7 +784,6 @@ func (s *Service) selectDocumentAndPatch(
 	}
 	userEmail, _ := c.Get("user_email").(string)
 	pageArgs.UserEmail = userEmail
-	pageArgs.FileTree = s.GetFileTree(pageArgs.FilePath)
 	pageArgs.WorkbenchLinkState = thoughtsWorkbenchLinkStateFromSubmission(
 		c,
 		selectedPlanPathFromThoughtsPath(pageArgs.FilePath),

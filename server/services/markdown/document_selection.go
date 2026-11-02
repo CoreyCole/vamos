@@ -213,3 +213,15 @@ func ThoughtsDirURL(dirPath string) string {
 	}
 	return thoughtsHref(canonical)
 }
+
+func thoughtsHref(path string) string {
+	path = strings.TrimPrefix(strings.TrimSpace(path), "/")
+	if path == "" {
+		return "/thoughts/"
+	}
+	parts := strings.Split(path, "/")
+	for i, part := range parts {
+		parts[i] = url.PathEscape(part)
+	}
+	return "/thoughts/" + strings.Join(parts, "/")
+}

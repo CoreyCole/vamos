@@ -7,26 +7,6 @@ import (
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 )
 
-// DirectoryListing renders a directory browser page with file tree sidebar.
-// Kept as a compatibility wrapper; normal routes use DirectoryWorkbenchPage.
-templ DirectoryListing(args *DirectoryArgs) {
-	{{
-		state, _ := workbench.BuildWorkbenchState(workbench.BuildWorkbenchStateInput{
-			UserEmail:  args.UserEmail,
-			Page:       workbench.WorkbenchPageThoughts,
-			View:       workbench.WorkbenchViewFocus,
-			ActivePath: args.Path,
-			Regions: []workbench.WorkbenchRegion{
-				{ID: "thoughts-sections", Slot: workbench.WorkbenchSlotNavigation, Kind: workbench.RegionThoughtsTree, Ratio: thoughtsNavigationRatio, MinRem: thoughtsNavigationMin, Visible: true, TargetID: "thoughts-sidebar-region", Component: workbench.SharedSidebar(BuildThoughtsDirectorySidebarArgs(args))},
-				{ID: "thoughts-document", Slot: workbench.WorkbenchSlotPrimary, Kind: workbench.RegionDocument, Ratio: thoughtsPrimaryRatio, MinRem: thoughtsPrimaryMin, Visible: true, TargetID: "thoughts-directory-region", Component: DirectoryPrimaryPanel(args)},
-				{ID: "thoughts-context", Slot: workbench.WorkbenchSlotContext, Kind: workbench.RegionEmpty, Ratio: thoughtsContextRatio, MinRem: thoughtsContextMin, Visible: false, TargetID: "thoughts-context-region", Component: EmptyDirectoryContextPanel()},
-			},
-			NormalRegions: thoughtsNormalRegions(false),
-		})
-	}}
-	@DirectoryWorkbenchPage(DirectoryWorkbenchArgs{Directory: args, Workbench: state})
-}
-
 templ DirectoryWorkbenchPage(args DirectoryWorkbenchArgs) {
 	{{ rootArgs := args.Directory.BuildRootArgs() }}
 	@layouts.Root(rootArgs) {

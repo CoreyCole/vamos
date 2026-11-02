@@ -427,12 +427,6 @@ func (s *Service) GetDirectoryListing(dirPath string) (*DirectoryArgs, error) {
 	}, nil
 }
 
-// GetFileTree builds a recursive file tree rooted at basePath.
-// Folders along activePath are expanded; the node matching activePath is marked active.
-func (s *Service) GetFileTree(activePath string) []FileTreeNode {
-	return s.buildTree("", activePath)
-}
-
 func InferWorkspaceRoot(markdownBasePath, docPath string) (string, bool) {
 	cleanDoc := NormalizeWorkspaceDocPath(docPath)
 	if cleanDoc == "" {
@@ -552,72 +546,6 @@ func displayDocumentName(name string) string {
 	default:
 		return name
 	}
-}
-
-func (s *Service) buildTree(relDir, activePath string) []FileTreeNode {
-	fullDir := filepath.Join(s.basePath, relDir)
-	entries, err := os.ReadDir(fullDir)
-	if err != nil {
-		return nil
-	}
-
-	// Separate dirs and files, then sort each group alphabetically
-	var dirs, files []os.DirEntry
-	for _, e := range entries {
-		name := e.Name()
-		if strings.HasPrefix(name, ".") {
-			continue
-		}
-		if e.IsDir() {
-			dirs = append(dirs, e)
-		} else if isThoughtsRenderableFile(name) {
-			files = append(files, e)
-		}
-	}
-
-	sort.Slice(dirs, func(i, j int) bool {
-		return strings.ToLower(dirs[i].Name()) < strings.ToLower(dirs[j].Name())
-	})
-	sort.Slice(files, func(i, j int) bool {
-		return strings.ToLower(files[i].Name()) < strings.ToLower(files[j].Name())
-	})
-
-	// Normalize activePath for comparison (strip "thoughts/" prefix)
-	cleanActive := strings.TrimPrefix(activePath, "thoughts/")
-	cleanActive = strings.TrimSuffix(cleanActive, "/")
-
-	var nodes []FileTreeNode
-
-	for _, d := range dirs {
-		dirPath := filepath.Join(relDir, d.Name())
-		// Expand if activePath starts with this directory
-		isOnActivePath := cleanActive == dirPath ||
-			strings.HasPrefix(cleanActive, dirPath+"/")
-		node := FileTreeNode{
-			Name:       d.Name(),
-			Path:       dirPath,
-			IsDir:      true,
-			IsExpanded: isOnActivePath,
-			IsActive:   cleanActive == dirPath,
-		}
-		if isOnActivePath {
-			node.Children = s.buildTree(dirPath, activePath)
-		}
-		nodes = append(nodes, node)
-	}
-
-	for _, f := range files {
-		filePath := filepath.Join(relDir, f.Name())
-		nodes = append(nodes, FileTreeNode{
-			Name:  displayDocumentName(f.Name()),
-			Path:  filePath,
-			IsDir: false,
-			IsActive: cleanActive == filePath ||
-				cleanActive == strings.TrimSuffix(filePath, ".md"),
-		})
-	}
-
-	return nodes
 }
 
 // extractTableOfContents extracts headings from the markdown AST
