@@ -2,7 +2,7 @@ package markdown
 
 templ CSVTableDocument(docPath string, table CSVTable, label string) {
 	{{ _ = docPath }}
-	<section class="document-table-content w-full">
+	<section class="document-table-content flex min-h-0 w-full flex-1 flex-col">
 		if table.TooLarge {
 			<p class="text-sm text-muted-foreground">{ table.Notice }</p>
 		} else if len(table.Headers) == 0 {

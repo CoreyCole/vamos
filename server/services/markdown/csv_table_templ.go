@@ -30,7 +30,7 @@ func CSVTableDocument(docPath string, table CSVTable, label string) templ.Compon
 		}
 		ctx = templ.ClearChildren(ctx)
 		_ = docPath
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<section class=\"document-table-content w-full\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<section class=\"document-table-content flex min-h-0 w-full flex-1 flex-col\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

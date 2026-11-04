@@ -42,7 +42,7 @@ templ ThoughtsTitleContent(title string) {
 }
 
 templ DocumentOnlyCommentSurface(component templ.Component, comments commentui.CommentableMarkdownArgs) {
-	<div class="relative h-full min-h-full min-w-0" data-commentui-container="true">
+	<div class={ documentOnlyCommentSurfaceClass(comments.DocPath) } data-commentui-container="true">
 		@component
 		@commentui.DocumentPatchTarget(comments, "Document")
 	</div>
@@ -134,8 +134,19 @@ func documentScrollRegionClass(kind DocumentKind) string {
 		return "min-h-0 flex-1 overflow-hidden"
 	case DocumentKindSource:
 		return "min-h-0 flex-1 overflow-auto bg-muted/20"
+	case DocumentKindCSVTable:
+		return "min-h-0 flex-1 overflow-hidden flex flex-col px-3 py-1.5"
 	default:
 		return "min-h-0 flex-1 overflow-y-auto px-3 py-1.5"
+	}
+}
+
+func documentOnlyCommentSurfaceClass(docPath string) string {
+	switch strings.ToLower(filepath.Ext(docPath)) {
+	case ".csv", ".tsv":
+		return "relative flex min-h-0 min-w-0 flex-1 flex-col"
+	default:
+		return "relative h-full min-h-full min-w-0"
 	}
 }
 

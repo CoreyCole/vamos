@@ -68,13 +68,39 @@
   /* Table styles for document content.
      Uses foreground with opacity for borders/headers so they're visible
      in both light and dark mode (--border is too close to bg in dark mode) */
-  .markdown-viewer .table-wrapper,
-  .document-table-content .table-wrapper {
+  .markdown-viewer .table-wrapper {
     margin: 1.5rem 0;
     width: fit-content;
     overflow: hidden;
     border-radius: 0.5rem;
     border: 1px solid hsl(var(--foreground) / 0.2);
+  }
+
+  .document-table-content .table-wrapper {
+    margin: 0.5rem 0;
+    width: auto;
+    max-width: 100%;
+    max-height: 100%;
+    min-height: 0;
+    overflow: auto;
+    border-radius: 0.5rem;
+    border: 1px solid hsl(var(--foreground) / 0.2);
+  }
+
+  .document-table-content thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background-color: hsl(var(--background));
+    background-image: linear-gradient(
+      hsl(var(--foreground) / 0.06),
+      hsl(var(--foreground) / 0.06)
+    );
+  }
+
+  .document-table-content td,
+  .document-table-content th {
+    vertical-align: top;
   }
 
   .markdown-viewer table,
