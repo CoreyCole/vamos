@@ -8,15 +8,18 @@ import (
 	"os"
 )
 
+const csvRenderMaxBytes int64 = 16 << 20
+
 type CSVCell struct {
 	Text string
 	html string
 }
 
 type CSVTable struct {
-	Headers   []CSVCell
-	Rows      [][]CSVCell
-	Truncated bool
+	Headers  []CSVCell
+	Rows     [][]CSVCell
+	TooLarge bool
+	Notice   string
 }
 
 type DelimitedFormat struct {
@@ -27,8 +30,16 @@ type DelimitedFormat struct {
 
 type CSVRenderer struct {
 	MaxRows        int
+	MaxBytes       int64
 	Renderer       *Renderer
 	SourceFallback *SourceRenderer
+}
+
+func (r CSVRenderer) renderMaxBytes() int64 {
+	if r.MaxBytes <= 0 {
+		return csvRenderMaxBytes
+	}
+	return r.MaxBytes
 }
 
 func (r CSVRenderer) Match(req DocumentRequest) bool {
@@ -40,14 +51,6 @@ func (r CSVRenderer) Render(
 	ctx context.Context,
 	req DocumentRequest,
 ) (RenderedDocument, error) {
-	content, err := os.ReadFile(req.FullPath)
-	if err != nil {
-		return RenderedDocument{}, fmt.Errorf("read delimited table: %w", err)
-	}
-	maxRows := r.MaxRows
-	if maxRows <= 0 {
-		maxRows = 500
-	}
 	format, ok := delimitedFormatForExtension(req.Extension)
 	if !ok {
 		return RenderedDocument{}, fmt.Errorf(
@@ -55,7 +58,30 @@ func (r CSVRenderer) Render(
 			req.Extension,
 		)
 	}
-	table, err := parseDelimitedTable(content, format, maxRows)
+	info, err := os.Stat(req.FullPath)
+	if err != nil {
+		return RenderedDocument{}, fmt.Errorf("stat delimited table: %w", err)
+	}
+	maxBytes := r.renderMaxBytes()
+	docPath := "thoughts/" + req.CleanPath
+	if info.Size() > maxBytes {
+		table := CSVTable{
+			TooLarge: true,
+			Notice:   csvTooLargeNotice(format.Label, info.Size(), maxBytes),
+		}
+		return RenderedDocument{
+			Path:        docPath,
+			Title:       DocumentTitle(docPath, nil),
+			Kind:        DocumentKindCSVTable,
+			Component:   CSVTableDocument(docPath, table, format.Label),
+			CommentMode: CommentModeDocumentOnly,
+		}, nil
+	}
+	content, err := os.ReadFile(req.FullPath)
+	if err != nil {
+		return RenderedDocument{}, fmt.Errorf("read delimited table: %w", err)
+	}
+	table, err := parseDelimitedTable(content, format, r.MaxRows)
 	if err != nil {
 		if r.SourceFallback != nil {
 			return renderSourceFallback(ctx, req, *r.SourceFallback)
@@ -65,7 +91,6 @@ func (r CSVRenderer) Render(
 	if err := renderCSVTableMarkdown(&table, r.Renderer); err != nil {
 		return RenderedDocument{}, fmt.Errorf("render %s cells: %w", format.Label, err)
 	}
-	docPath := "thoughts/" + req.CleanPath
 	return RenderedDocument{
 		Path:          docPath,
 		Title:         DocumentTitle(docPath, nil),
@@ -74,6 +99,26 @@ func (r CSVRenderer) Render(
 		Component:     CSVTableDocument(docPath, table, format.Label),
 		CommentMode:   CommentModeDocumentOnly,
 	}, nil
+}
+
+func csvTooLargeNotice(label string, sizeBytes, maxBytes int64) string {
+	return fmt.Sprintf(
+		"This %s is too large to display (%s > %s).",
+		label,
+		csvSizeMBLabel(sizeBytes),
+		csvSizeMBLabel(maxBytes),
+	)
+}
+
+func csvSizeMBLabel(n int64) string {
+	const mib = int64(1 << 20)
+	if n < 0 {
+		n = 0
+	}
+	if n%mib == 0 {
+		return fmt.Sprintf("%d MB", n/mib)
+	}
+	return fmt.Sprintf("%.1f MB", float64(n)/float64(mib))
 }
 
 func delimitedFormatForExtension(ext string) (DelimitedFormat, bool) {
@@ -111,7 +156,6 @@ func parseDelimitedTable(
 	rows := records[1:]
 	if maxRows > 0 && len(rows) > maxRows {
 		rows = rows[:maxRows]
-		table.Truncated = true
 	}
 	table.Rows = make([][]CSVCell, len(rows))
 	for i, row := range rows {

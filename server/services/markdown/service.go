@@ -124,7 +124,7 @@ func NewServiceWithOptions(
 		NewMarkdownDocumentRenderer(service, renderer, opts.Projects),
 		HTMLAppletRenderer{},
 		ImageRenderer{},
-		CSVRenderer{MaxRows: 500, Renderer: renderer, SourceFallback: &sourceRenderer},
+		CSVRenderer{Renderer: renderer, SourceFallback: &sourceRenderer},
 		sourceRenderer,
 	)
 	return service, nil

@@ -3,12 +3,11 @@ package markdown
 templ CSVTableDocument(docPath string, table CSVTable, label string) {
 	{{ _ = docPath }}
 	<section class="document-table-content w-full">
-		if len(table.Headers) == 0 {
+		if table.TooLarge {
+			<p class="text-sm text-muted-foreground">{ table.Notice }</p>
+		} else if len(table.Headers) == 0 {
 			<p class="text-sm text-muted-foreground">Empty { label } file.</p>
 		} else {
-			if table.Truncated {
-				<p class="mb-3 text-xs text-muted-foreground">Showing first rows; truncated.</p>
-			}
 			<div class="table-wrapper">
 				<table>
 					<thead>

@@ -2,6 +2,9 @@ package markdown
 
 import (
 	"bytes"
+	"fmt"
+	"html"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -121,44 +124,231 @@ func TestCSVRendererDoesNotActivateUnsafeMarkdownLinks(t *testing.T) {
 	}
 }
 
-func TestCSVTableDocumentShowsTruncationWithoutDocumentChrome(t *testing.T) {
+func TestParseCSVTableUnlimitedRendersAllRows(t *testing.T) {
 	t.Parallel()
 
-	var buf bytes.Buffer
-	table := CSVTable{
-		Headers:   []CSVCell{{Text: "name"}},
-		Rows:      [][]CSVCell{{{Text: "a"}}},
-		Truncated: true,
+	cases := []struct {
+		name    string
+		rows    int
+		maxRows int
+	}{
+		{name: "501 rows maxRows 0", rows: 501, maxRows: 0},
+		{name: "501 rows maxRows negative", rows: 501, maxRows: -3},
+		{name: "5000 rows maxRows 0", rows: 5000, maxRows: 0},
 	}
-	if err := CSVTableDocument(
-		"thoughts/data.csv",
-		table,
-		"CSV",
-	).Render(t.Context(), &buf); err != nil {
-		t.Fatal(err)
-	}
-	html := buf.String()
-	if !strings.Contains(html, "truncated") {
-		t.Fatalf("missing truncation status: %s", html)
-	}
-	if strings.Contains(html, "thoughts/data.csv") ||
-		strings.Contains(html, "CSV table:") {
-		t.Fatalf("truncation status reintroduced document chrome: %s", html)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			table, err := parseCSVTable(delimitedRows(",", tc.rows), tc.maxRows)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if table.TooLarge {
+				t.Fatal("TooLarge=true")
+			}
+			if len(table.Rows) != tc.rows {
+				t.Fatalf("len(rows)=%d, want %d", len(table.Rows), tc.rows)
+			}
+			got := table.Rows[len(table.Rows)-1][1].Text
+			want := fmt.Sprintf("row-%d", tc.rows)
+			if got != want {
+				t.Fatalf("last row name=%q, want %q", got, want)
+			}
+		})
 	}
 }
 
-func TestParseCSVTableTruncatesRows(t *testing.T) {
+func TestParseCSVTableCapsRowsWhenMaxRowsSet(t *testing.T) {
 	t.Parallel()
 
-	table, err := parseCSVTable([]byte("a,b\n1,2\n3,4"), 1)
+	table, err := parseCSVTable([]byte("a,b\n1,2\n3,4\n5,6"), 2)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !table.Truncated {
-		t.Fatal("table.Truncated=false")
+	if table.TooLarge {
+		t.Fatal("TooLarge=true")
 	}
-	if len(table.Rows) != 1 || table.Rows[0][0].Text != "1" {
+	if len(table.Rows) != 2 || table.Rows[0][0].Text != "1" ||
+		table.Rows[1][0].Text != "3" {
 		t.Fatalf("rows=%#v", table.Rows)
+	}
+}
+
+func TestCSVRendererRendersMoreThan500RowsWithoutTruncationNotice(t *testing.T) {
+	t.Parallel()
+
+	const rows = 501
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "data.csv"), delimitedRows(",", rows))
+	service, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := service.RenderThoughtsDocument(t.Context(), "data.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	if err := page.ViewerArgs.BodyComponent.Render(t.Context(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	last := fmt.Sprintf("row-%d", rows)
+	if !strings.Contains(html, last) {
+		t.Fatalf("missing last row %q: %s", last, html)
+	}
+	assertNoTruncationCopy(t, html)
+}
+
+func TestTSVRendererRendersMoreThan500RowsWithoutTruncationNotice(t *testing.T) {
+	t.Parallel()
+
+	const rows = 501
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "data.tsv"), delimitedRows("\t", rows))
+	service, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := service.RenderThoughtsDocument(t.Context(), "data.tsv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	if err := page.ViewerArgs.BodyComponent.Render(t.Context(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	last := fmt.Sprintf("row-%d", rows)
+	if !strings.Contains(html, last) {
+		t.Fatalf("missing last row %q: %s", last, html)
+	}
+	assertNoTruncationCopy(t, html)
+}
+
+func TestCSVRendererTooLargeOmitsTableAndChrome(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name    string
+		ext     string
+		label   string
+		content []byte
+	}{
+		{
+			name:    "csv",
+			ext:     ".csv",
+			label:   "CSV",
+			content: []byte("name,value\nAda,1\nGrace,2\n"),
+		},
+		{
+			name:    "tsv",
+			ext:     ".tsv",
+			label:   "TSV",
+			content: []byte("name\tvalue\nAda\t1\nGrace\t2\n"),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			name := "data" + tc.ext
+			fullPath := filepath.Join(root, name)
+			mustWriteFile(t, fullPath, tc.content)
+			info, err := os.Stat(fullPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			maxBytes := info.Size() - 1
+			if maxBytes <= 0 {
+				t.Fatal("fixture too small to exceed MaxBytes")
+			}
+			doc, err := (CSVRenderer{MaxBytes: maxBytes}).Render(
+				t.Context(),
+				DocumentRequest{
+					CleanPath: name,
+					FullPath:  fullPath,
+					Extension: tc.ext,
+				},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if doc.ClipboardText != "" {
+				t.Fatalf("ClipboardText=%q, want empty", doc.ClipboardText)
+			}
+			var buf bytes.Buffer
+			if err := doc.Component.Render(t.Context(), &buf); err != nil {
+				t.Fatal(err)
+			}
+			body := buf.String()
+			wantNotice := html.EscapeString(
+				csvTooLargeNotice(tc.label, info.Size(), maxBytes),
+			)
+			if !strings.Contains(body, wantNotice) {
+				t.Fatalf("missing notice %q: %s", wantNotice, body)
+			}
+			if strings.Contains(body, "<table") || strings.Contains(body, "<tbody") {
+				t.Fatalf("too-large notice rendered a table: %s", body)
+			}
+			if strings.Contains(body, "Ada") || strings.Contains(body, "Grace") {
+				t.Fatalf("too-large notice included table rows: %s", body)
+			}
+			if strings.Contains(body, "thoughts/"+name) ||
+				strings.Contains(body, tc.label+" table:") {
+				t.Fatalf("too-large notice reintroduced document chrome: %s", body)
+			}
+			if strings.Contains(body, "Download") || strings.Contains(body, "raw file") {
+				t.Fatalf("too-large notice promised download/raw: %s", body)
+			}
+			assertNoTruncationCopy(t, body)
+		})
+	}
+}
+
+func TestCSVTooLargeNoticeWording(t *testing.T) {
+	t.Parallel()
+
+	got := csvTooLargeNotice("CSV", csvRenderMaxBytes+1, csvRenderMaxBytes)
+	want := "This CSV is too large to display (16.0 MB > 16 MB)."
+	if got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+	got = csvTooLargeNotice("TSV", 32<<20, csvRenderMaxBytes)
+	want = "This TSV is too large to display (32 MB > 16 MB)."
+	if got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestCSVRendererMaxBytesDefaultsTo16MiB(t *testing.T) {
+	t.Parallel()
+
+	if got := (CSVRenderer{}).renderMaxBytes(); got != csvRenderMaxBytes {
+		t.Fatalf("default MaxBytes=%d, want %d", got, csvRenderMaxBytes)
+	}
+	if got := (CSVRenderer{MaxBytes: 12}).renderMaxBytes(); got != 12 {
+		t.Fatalf("override MaxBytes=%d, want 12", got)
+	}
+}
+
+func delimitedRows(sep string, rows int) []byte {
+	var b strings.Builder
+	b.WriteString("id" + sep + "name\n")
+	for i := 1; i <= rows; i++ {
+		fmt.Fprintf(&b, "%d%srow-%d\n", i, sep, i)
+	}
+	return []byte(b.String())
+}
+
+func assertNoTruncationCopy(t *testing.T, html string) {
+	t.Helper()
+	for _, banned := range []string{
+		"truncated",
+		"Showing first rows",
+	} {
+		if strings.Contains(html, banned) {
+			t.Fatalf("found %q: %s", banned, html)
+		}
 	}
 }
 
