@@ -104,10 +104,6 @@ func commentsToggleClickAction(_ ThreadArtifactBrowserArgs) string {
 	return workbench.CommentsToggleClickAction()
 }
 
-func commentsCloseCookieJS() string {
-	return workbench.CommentsCloseCookieJS()
-}
-
 func chatToggleClickAction() string {
 	return workbench.ChatToggleClickAction()
 }

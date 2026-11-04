@@ -3,8 +3,6 @@ package markdown
 import (
 	"encoding/json"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/CoreyCole/vamos/server/layouts"
@@ -91,78 +89,4 @@ templ DocumentPanel(args DocumentPanelArgs) {
 	<div id="thoughts-document-panel" class="h-full min-h-0 overflow-hidden">
 		@DocumentSurface(args.Document)
 	</div>
-}
-
-templ EmbeddedChatInitialContent(urlReplacement string, component templ.Component) {
-	if urlReplacement != "" {
-		<div id="thoughts-url-sync" data-replace-url={ strconv.Quote(urlReplacement) }></div>
-	}
-	@component
-}
-
-templ ThoughtsContextPanel(args ThoughtsContextArgs) {
-	<div id="thoughts-context-panel" class="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-		if args.Mode == "comments" {
-			@commentui.CommentsContextPanel(commentui.BuildCommentsPanelArgs(args.CommentUI, ""))
-		} else if args.Mode == "chat" {
-			<div class="hidden" aria-hidden="true">
-				@commentui.CommentsContextPanel(commentui.BuildCommentsPanelArgs(args.CommentUI, ""))
-			</div>
-			if args.Component != nil {
-				@args.Component
-			} else {
-				<div class="flex h-full min-h-0 flex-col justify-end gap-3 bg-background p-3 text-sm text-muted-foreground">
-					<p>No chat workspace is selected yet.</p>
-				</div>
-			}
-		} else {
-			<div class="hidden" aria-hidden="true">
-				@commentui.CommentsContextPanel(commentui.BuildCommentsPanelArgs(args.CommentUI, ""))
-			</div>
-			<div class="flex h-full items-center justify-center p-4 text-sm text-muted-foreground">Open comments or chat context from document actions.</div>
-		}
-	</div>
-}
-
-// MarkdownSidebar shows table of contents
-templ MarkdownSidebar(toc []TocItem) {
-	<div>
-		<nav class="space-y-1">
-			for _, item := range toc {
-				<a
-					href={ templ.URL("#" + item.ID) }
-					class={ "block text-sm text-muted-foreground hover:text-foreground transition-colors duration-200", tocLevelClass(item.Level) }
-					{ markdownSectionAttrs(item.ID)... }
-				>
-					{ item.Text }
-				</a>
-			}
-		</nav>
-	</div>
-}
-
-func markdownSectionAttrs(id string) templ.Attributes {
-	id = strings.TrimSpace(id)
-	if id == "" {
-		return templ.Attributes{}
-	}
-	return templ.Attributes{
-		workbench.WorkbenchSectionLinkAttr:      true,
-		workbench.WorkbenchSectionTargetAttr:    id,
-		workbench.WorkbenchSectionRegionAttr:    workbench.DefaultSectionRegionKey,
-		workbench.WorkbenchSectionContainerAttr: workbench.DefaultSectionContainerID,
-	}
-}
-
-func tocLevelClass(level int) string {
-	switch level {
-	case 1:
-		return "font-medium"
-	case 2:
-		return "ml-3"
-	case 3:
-		return "ml-6"
-	default:
-		return "ml-9"
-	}
 }

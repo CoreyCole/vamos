@@ -2,29 +2,16 @@ package agentchat
 
 import (
 	"fmt"
-	"hash/fnv"
 	"net/url"
 	"strconv"
 	"strings"
-
-	agentworkspace "github.com/CoreyCole/vamos/pkg/agents/workspace"
-	"github.com/CoreyCole/vamos/pkg/datastarui/components/sheet"
-	"github.com/CoreyCole/vamos/pkg/datastarui/utils"
 )
 
 const (
 	piSessionOpenEndpoint = "/agent-chat/pi-sessions/open"
 
-	agentChatMobilePaneChat = "chat"
-	agentChatMobilePaneRail = "rail"
-	agentChatThreadSheetID  = "agent_chat_thread_sheet"
+	agentChatThreadSheetID = "agent_chat_thread_sheet"
 )
-
-type agentChatShellSignalOptions struct {
-	IncludeRightRailTab bool
-	SidebarOpenGroup    string
-	SidebarOpenGroups   string
-}
 
 func freeformForkAction(threadID string) string {
 	if strings.TrimSpace(threadID) == "" {
@@ -47,20 +34,6 @@ func threadChatAction(threadID, action string) string {
 
 func piSessionOpenAction() string {
 	return "@post('" + piSessionOpenEndpoint + "', {contentType: 'form'})"
-}
-
-func piSessionOpenIndicator(thread ThreadSidebarThread) string {
-	key := strings.TrimSpace(thread.SessionPath)
-	if key == "" {
-		key = strings.TrimSpace(thread.Title)
-	}
-	h := fnv.New32a()
-	_, _ = h.Write([]byte(key))
-	return fmt.Sprintf("_openingPiSession%x", h.Sum32())
-}
-
-func piSessionOpenIndicatorSignal(thread ThreadSidebarThread) string {
-	return "$" + piSessionOpenIndicator(thread)
 }
 
 func workspaceForkAction(workspaceID, threadID string) string {
@@ -218,118 +191,6 @@ fetch('%s?prefix=' + encodeURIComponent($slashPrefix), {headers: {'Accept': 'app
     popover.replaceChildren(...buttons);
   })
   .catch(() => { showSlashMessage('Command discovery failed', 'px-2 py-1 text-xs text-destructive'); });`, commandURL)
-}
-
-func chatShellSignals(hasSelectedThread bool) string {
-	return agentChatShellSignals(hasSelectedThread, agentChatShellSignalOptions{})
-}
-
-func chatShellSignalsForPlanSidebar(
-	hasSelectedThread bool,
-	sidebar PlanSidebarState,
-) string {
-	return agentChatShellSignals(hasSelectedThread, agentChatShellSignalOptions{
-		SidebarOpenGroup:  planSidebarInitialOpenGroup(sidebar),
-		SidebarOpenGroups: planSidebarInitialOpenGroups(sidebar),
-	})
-}
-
-func workspaceShellSignals(hasSelectedThread bool, sidebar PlanSidebarState) string {
-	return agentChatShellSignals(hasSelectedThread, agentChatShellSignalOptions{
-		IncludeRightRailTab: true,
-		SidebarOpenGroup:    planSidebarInitialOpenGroup(sidebar),
-		SidebarOpenGroups:   planSidebarInitialOpenGroups(sidebar),
-	})
-}
-
-func agentChatShellSignals(
-	hasSelectedThread bool,
-	opts agentChatShellSignalOptions,
-) string {
-	parts := []string{
-		"showDetails: true",
-		"showSidebar: " + workspaceSidebarVisibilitySignal(hasSelectedThread),
-		"showArtifactTree: false",
-		"mobilePane: " + strconv.Quote(agentChatMobilePaneChat),
-		"agentChatToast: ''",
-	}
-	parts = append(
-		parts,
-		"agentChatSidebarOpenGroup: "+strconv.Quote(opts.SidebarOpenGroup),
-		"agentChatSidebarOpenGroups: "+strconv.Quote(opts.SidebarOpenGroups),
-	)
-	if opts.IncludeRightRailTab {
-		parts = append(parts, "rightRailTab: 'artifacts'")
-	}
-	parts = append(parts, agentChatThreadSheetSignals())
-	return "{" + strings.Join(parts, ", ") + "}"
-}
-
-func agentChatThreadSheetSignals() string {
-	signals := utils.Signals(agentChatThreadSheetID, sheet.SheetSignals{
-		Open:        false,
-		Modal:       true,
-		ReturnValue: nil,
-	})
-	return strings.TrimSuffix(strings.TrimPrefix(signals.DataSignals, "{"), "}")
-}
-
-func agentChatDesktopGridInitialClass(hasSelectedThread bool) string {
-	if agentworkspace.SidebarVisibleByDefault(hasSelectedThread) {
-		return "grid-cols-[minmax(0,1fr)_20rem]"
-	}
-	return "grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
-}
-
-func workspaceSidebarVisibilitySignal(hasSelectedThread bool) string {
-	if agentworkspace.SidebarVisibleByDefault(hasSelectedThread) {
-		return "true"
-	}
-	return "false"
-}
-
-func planSidebarInitialOpenGroup(state PlanSidebarState) string {
-	keys := expandedPlanSidebarNodeKeys(state.Nodes)
-	if len(keys) == 0 {
-		return ""
-	}
-	return keys[0]
-}
-
-func planSidebarInitialOpenGroups(state PlanSidebarState) string {
-	keys := expandedPlanSidebarNodeKeys(state.Nodes)
-	if len(keys) == 0 {
-		return ""
-	}
-	return "|" + strings.Join(keys, "|") + "|"
-}
-
-func expandedPlanSidebarNodeKeys(nodes []PlanSidebarNode) []string {
-	keys := []string{}
-	for _, node := range nodes {
-		if node.Expanded || node.Active {
-			if key := strings.TrimSpace(node.Key); key != "" {
-				keys = append(keys, key)
-			}
-		}
-		keys = append(keys, expandedPlanSidebarNodeKeys(node.Children)...)
-	}
-	return keys
-}
-
-func workspaceSidebarGroupSignalKey(group ThreadSidebarGroup) string {
-	return strings.TrimSpace(group.Key)
-}
-
-func workspaceSidebarGroupOpenExpression(group ThreadSidebarGroup) string {
-	return "$agentChatSidebarOpenGroup === " + strconv.Quote(
-		workspaceSidebarGroupSignalKey(group),
-	)
-}
-
-func workspaceSidebarGroupSetExpression(group ThreadSidebarGroup) string {
-	key := strconv.Quote(workspaceSidebarGroupSignalKey(group))
-	return "$agentChatSidebarOpenGroup = ($agentChatSidebarOpenGroup === " + key + " ? \"\" : " + key + ")"
 }
 
 func workspacePromptPlaceholder(hasThread bool) string {

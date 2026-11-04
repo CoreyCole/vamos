@@ -15,7 +15,6 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/starfederation/datastar-go/datastar"
 
-	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 	"github.com/CoreyCole/vamos/server/services/agenthome"
 	"github.com/CoreyCole/vamos/server/services/applets"
@@ -27,8 +26,6 @@ const (
 	thoughtsContextModeComments = "comments"
 	thoughtsContextModeChat     = "chat"
 	thoughtsContextModeThreads  = "threads"
-
-	thoughtsWorkspacesLimit = 200
 
 	thoughtsURLSyncSelectorID = "thoughts-url-sync"
 )
@@ -286,16 +283,6 @@ func (s *Service) threadHrefForDoc(ctx context.Context, docPath string) string {
 	return "/threads/" + url.PathEscape(threadID) + "?artifact=" + artifact
 }
 
-func thoughtsViewFromQuery(c echo.Context) (workbench.WorkbenchView, string) {
-	mode := thoughtsContextMode(c)
-	switch mode {
-	case thoughtsContextModeComments, thoughtsContextModeChat, thoughtsContextModeThreads:
-		return workbench.WorkbenchViewSplit, mode
-	default:
-		return workbench.WorkbenchViewFocus, ""
-	}
-}
-
 func (s *Service) thoughtsAppletPageHref(ctx context.Context, requestPath string) string {
 	if s == nil || strings.TrimSpace(s.basePath) == "" ||
 		strings.TrimSpace(requestPath) == "" {
@@ -412,28 +399,6 @@ func viewportClassForRequest(c echo.Context) workbench.ViewportClass {
 	return workbench.ResolveViewportClass(c.Request().Header, c.Request().UserAgent())
 }
 
-func (s *Service) savedThoughtsWorkbenchConfig(
-	c echo.Context,
-	userEmail string,
-	view workbench.WorkbenchView,
-	viewportClass workbench.ViewportClass,
-) *workbench.WorkbenchConfig {
-	if s.layoutPrefs == nil || strings.TrimSpace(userEmail) == "" {
-		return nil
-	}
-	cfg, err := s.layoutPrefs.Get(
-		c.Request().Context(),
-		userEmail,
-		workbench.WorkbenchPageThoughts,
-		view,
-		viewportClass,
-	)
-	if err != nil {
-		return nil
-	}
-	return cfg
-}
-
 func (s *Service) buildThoughtsV2WorkbenchState(
 	c echo.Context,
 	pageArgs *PageArgs,
@@ -509,115 +474,6 @@ func (s *Service) buildThoughtsWorkbenchState(
 		)
 	}
 	return s.buildThoughtsV2WorkbenchState(c, pageArgs)
-}
-
-func applyThoughtsRendererURLReplacement(
-	currentURL string,
-	chatComponent templ.Component,
-	chatReplacement string,
-	hermesComponent templ.Component,
-	hermesReplacement string,
-) (templ.Component, templ.Component) {
-	replacement := composeThoughtsRendererURLReplacement(
-		currentURL,
-		chatReplacement,
-		hermesReplacement,
-	)
-	if replacement == "" {
-		return chatComponent, hermesComponent
-	}
-	if chatComponent != nil {
-		return EmbeddedChatInitialContent(replacement, chatComponent), hermesComponent
-	}
-	if hermesComponent != nil {
-		return chatComponent, EmbeddedChatInitialContent(replacement, hermesComponent)
-	}
-	return chatComponent, hermesComponent
-}
-
-func composeThoughtsRendererURLReplacement(
-	currentURL, chatReplacement, hermesReplacement string,
-) string {
-	chatReplacement = strings.TrimSpace(chatReplacement)
-	hermesReplacement = strings.TrimSpace(hermesReplacement)
-	if chatReplacement == "" && hermesReplacement == "" {
-		return ""
-	}
-	current, err := url.Parse(strings.TrimSpace(currentURL))
-	if err != nil {
-		return ""
-	}
-	composed := current
-	if chatReplacement != "" {
-		parsed, err := url.Parse(chatReplacement)
-		if err != nil {
-			return ""
-		}
-		originalHermes := current.Query().Get("hermes_thread")
-		composed = parsed
-		query := composed.Query()
-		setQueryValue(query, "hermes_thread", originalHermes)
-		composed.RawQuery = query.Encode()
-	}
-	if hermesReplacement != "" {
-		parsed, err := url.Parse(hermesReplacement)
-		if err != nil {
-			return ""
-		}
-		query := composed.Query()
-		setQueryValue(query, "hermes_thread", parsed.Query().Get("hermes_thread"))
-		composed.RawQuery = query.Encode()
-	}
-	return composed.String()
-}
-
-func (s *Service) buildEmbeddedChatComponent(
-	c echo.Context,
-	pageArgs *PageArgs,
-) (templ.Component, EmbeddedChatURLReplacement, error) {
-	return s.buildEmbeddedChatComponentForRequest(c, EmbeddedChatRenderRequest{
-		UserEmail:        pageArgs.UserEmail,
-		DocPath:          pageArgs.FilePath,
-		Context:          thoughtsContextMode(c),
-		WorkspaceID:      strings.TrimSpace(c.QueryParam("chat_workspace")),
-		ThreadID:         strings.TrimSpace(c.QueryParam("thread")),
-		RunID:            strings.TrimSpace(c.QueryParam("run")),
-		WorkspaceContext: pageArgs.WorkspaceContext,
-	})
-}
-
-func (s *Service) buildEmbeddedChatComponentForRequest(
-	c echo.Context,
-	request EmbeddedChatRenderRequest,
-) (templ.Component, EmbeddedChatURLReplacement, error) {
-	if s.embeddedChatRenderer == nil {
-		return nil, EmbeddedChatURLReplacement{}, nil
-	}
-	return s.embeddedChatRenderer.RenderEmbeddedChatPanel(
-		c.Request().Context(),
-		request,
-	)
-}
-
-func (s *Service) buildHermesThreadsComponent(
-	c echo.Context,
-	userEmail, docPath, planHint string,
-	isDirectory bool,
-	state ThoughtsWorkbenchLinkState,
-) (templ.Component, HermesThreadsURLReplacement, error) {
-	if s.hermesThreadsRenderer == nil {
-		return nil, HermesThreadsURLReplacement{}, nil
-	}
-	selectedPlanPath := selectedPlanPathFromThoughtsPath(docPath)
-	return s.hermesThreadsRenderer.RenderHermesThreadsPanel(
-		c.Request().Context(),
-		HermesThreadsRenderRequest{
-			UserEmail: userEmail, DocPath: docPath,
-			SelectedPlanPath: selectedPlanPath, PlanHint: planHint,
-			NoPlan: selectedPlanPath == "", IsDirectory: isDirectory,
-			CurrentURL: c.Request().URL.RequestURI(), LinkState: state,
-		},
-	)
 }
 
 func (s *Service) buildThoughtsDirectoryWorkbenchState(
@@ -1080,21 +936,6 @@ func (s *Service) OpenChatForDocument(c echo.Context) error {
 	return sse.ExecuteScript(
 		"document.getElementById('agent-chat-composer-input')?.focus()",
 	)
-}
-
-func (s *Service) listWorkbenchWorkspaces(c echo.Context) []db.Workspace {
-	resolver, ok := s.workspaceResolver.(WorkspaceListResolver)
-	if !ok {
-		return nil
-	}
-	workspaces, err := resolver.ListWorkspaces(
-		c.Request().Context(),
-		thoughtsWorkspacesLimit,
-	)
-	if err != nil {
-		return nil
-	}
-	return workspaces
 }
 
 func (s *Service) SelectChatWorkspaceCandidate(c echo.Context) error {

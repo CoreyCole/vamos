@@ -10,16 +10,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CoreyCole/vamos/server/services/appletruntime"
 	"github.com/labstack/echo/v4"
+
+	"github.com/CoreyCole/vamos/server/services/appletruntime"
 )
 
 func TestRepositoryExampleManifestsRegister(t *testing.T) {
 	repoExamplesRoot := filepath.Clean(filepath.Join("..", "..", "..", "..", "examples"))
-	if _, err := os.Stat(filepath.Join(repoExamplesRoot, "streamlit", "AGENTS.md")); err != nil {
+	if _, err := os.Stat(
+		filepath.Join(repoExamplesRoot, "streamlit", "AGENTS.md"),
+	); err != nil {
 		t.Skipf("repo examples root unavailable: %v", err)
 	}
-	service, err := NewService(Options{ExamplesRoot: repoExamplesRoot, AppletRuntime: &fakeRuntime{}})
+	service, err := NewService(
+		Options{ExamplesRoot: repoExamplesRoot, AppletRuntime: &fakeRuntime{}},
+	)
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -29,8 +34,8 @@ func TestRepositoryExampleManifestsRegister(t *testing.T) {
 	c := e.NewContext(req, rec)
 	c.SetParamNames("id")
 	c.SetParamValues("streamlit")
-	if err := service.HandlePage(c); err != nil {
-		t.Fatalf("HandlePage(streamlit) error = %v", err)
+	if err := service.applets.HandleAppletPage(c); err != nil {
+		t.Fatalf("HandleAppletPage(streamlit) error = %v", err)
 	}
 	if !strings.Contains(rec.Body.String(), "/examples/streamlit/app/") {
 		t.Fatalf("streamlit page missing app iframe route:\n%s", rec.Body.String())
@@ -42,7 +47,16 @@ func TestRepositoryExampleManifestsRegister(t *testing.T) {
 
 func TestHandlePageRendersDocumentWorkbenchApplet(t *testing.T) {
 	root := writeExampleManifest(t)
-	service, err := NewService(Options{ExamplesRoot: root, AppletRuntime: &fakeRuntime{state: appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}}})
+	service, err := NewService(
+		Options{
+			ExamplesRoot: root,
+			AppletRuntime: &fakeRuntime{
+				state: appletruntime.AppletProcessState{
+					Status: appletruntime.ProcessStatusHealthy,
+				},
+			},
+		},
+	)
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -54,8 +68,8 @@ func TestHandlePageRendersDocumentWorkbenchApplet(t *testing.T) {
 	c.SetParamNames("id")
 	c.SetParamValues("wordle")
 
-	if err := service.HandlePage(c); err != nil {
-		t.Fatalf("HandlePage() error = %v", err)
+	if err := service.applets.HandleAppletPage(c); err != nil {
+		t.Fatalf("HandleAppletPage() error = %v", err)
 	}
 	html := rec.Body.String()
 	for _, want := range []string{"doc-workbench-sidebar", "doc-workbench-center", "doc-workbench-right", "examples/wordle/AGENTS.md", "/examples/wordle/app/"} {
@@ -70,11 +84,15 @@ func TestHandlePageRendersDocumentWorkbenchApplet(t *testing.T) {
 
 func TestHandleAppProxiesScopedRouteThroughRuntime(t *testing.T) {
 	root := writeExampleManifest(t)
-	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(r.URL.Path))
-	}))
+	backend := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(r.URL.Path))
+		}),
+	)
 	defer backend.Close()
-	service, err := NewService(Options{ExamplesRoot: root, AppletRuntime: &fakeRuntime{target: backend.URL}})
+	service, err := NewService(
+		Options{ExamplesRoot: root, AppletRuntime: &fakeRuntime{target: backend.URL}},
+	)
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -86,8 +104,8 @@ func TestHandleAppProxiesScopedRouteThroughRuntime(t *testing.T) {
 	c.SetParamNames("id")
 	c.SetParamValues("wordle")
 
-	if err := service.HandleApp(c); err != nil {
-		t.Fatalf("HandleApp() error = %v", err)
+	if err := service.applets.HandleAppletProxy(c); err != nil {
+		t.Fatalf("HandleAppletProxy() error = %v", err)
 	}
 	if got := strings.TrimSpace(rec.Body.String()); got != "/events" {
 		t.Fatalf("proxied path = %q, want /events", got)
@@ -96,11 +114,15 @@ func TestHandleAppProxiesScopedRouteThroughRuntime(t *testing.T) {
 
 func TestHandleAliasProxiesRootAliasThroughRuntime(t *testing.T) {
 	root := writeExampleManifest(t)
-	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(r.Method + " " + r.URL.Path))
-	}))
+	backend := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(r.Method + " " + r.URL.Path))
+		}),
+	)
 	defer backend.Close()
-	service, err := NewService(Options{ExamplesRoot: root, AppletRuntime: &fakeRuntime{target: backend.URL}})
+	service, err := NewService(
+		Options{ExamplesRoot: root, AppletRuntime: &fakeRuntime{target: backend.URL}},
+	)
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -137,7 +159,11 @@ applet:
     - pattern: /static/*
 ---
 `
-	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(body), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(dir, "AGENTS.md"),
+		[]byte(body),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	service, err := NewService(Options{ExamplesRoot: root, AppletRuntime: &fakeRuntime{}})
@@ -173,7 +199,11 @@ applet:
       methods: [POST]
 ---
 `
-	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(body), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(dir, "AGENTS.md"),
+		[]byte(body),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	return root
@@ -184,22 +214,33 @@ type fakeRuntime struct {
 	state  appletruntime.AppletProcessState
 }
 
-func (m *fakeRuntime) EnsureStarted(context.Context, appletruntime.RuntimeConfig) (appletruntime.AppletProcessState, error) {
+func (m *fakeRuntime) EnsureStarted(
+	context.Context,
+	appletruntime.RuntimeConfig,
+) (appletruntime.AppletProcessState, error) {
 	if m.state.Status == "" {
 		m.state.Status = appletruntime.ProcessStatusHealthy
 	}
 	return m.state, nil
 }
 
-func (m *fakeRuntime) Start(ctx context.Context, cfg appletruntime.RuntimeConfig) (appletruntime.ProcessState, error) {
+func (m *fakeRuntime) Start(
+	ctx context.Context,
+	cfg appletruntime.RuntimeConfig,
+) (appletruntime.ProcessState, error) {
 	return m.EnsureStarted(ctx, cfg)
 }
 
 func (m *fakeRuntime) Stop(context.Context, string) error { return nil }
 
-func (m *fakeRuntime) Health(context.Context, string) (appletruntime.AppletProcessState, error) {
+func (m *fakeRuntime) Health(
+	context.Context,
+	string,
+) (appletruntime.AppletProcessState, error) {
 	if m.state.Status == "" {
-		return appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}, nil
+		return appletruntime.AppletProcessState{
+			Status: appletruntime.ProcessStatusHealthy,
+		}, nil
 	}
 	return m.state, nil
 }
@@ -213,6 +254,9 @@ func (m *fakeRuntime) ProxyTarget(string) (string, bool) {
 
 func (m *fakeRuntime) Touch(string, int) {}
 
-func (m *fakeRuntime) SweepInactive(context.Context, time.Time) ([]appletruntime.AppletProcessState, error) {
+func (m *fakeRuntime) SweepInactive(
+	context.Context,
+	time.Time,
+) ([]appletruntime.AppletProcessState, error) {
 	return nil, nil
 }

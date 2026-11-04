@@ -610,154 +610,6 @@ func (h *Handler) StreamThread(c echo.Context) error {
 	}
 }
 
-func (h *Handler) StreamWorkspace(c echo.Context) error {
-	userEmail, ok := c.Get("user_email").(string)
-	if !ok || userEmail == "" {
-		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
-	}
-
-	workspaceID := strings.TrimSpace(c.Param("workspace_id"))
-	if _, err := h.service.GetWorkspaceForUserOrTrustedImport(
-		c.Request().Context(),
-		userEmail,
-		workspaceID,
-	); err != nil {
-		threadID := strings.TrimSpace(c.QueryParam("thread"))
-		if _, _, trustedErr := h.service.trustedImportedWorkspaceThread(
-			c.Request().Context(),
-			workspaceID,
-			threadID,
-		); trustedErr != nil {
-			return echo.NewHTTPError(http.StatusNotFound, err.Error())
-		}
-	}
-
-	sse := datastar.NewSSE(c.Response().Writer, c.Request())
-	ctx := c.Request().Context()
-	signalCh := h.service.notifier.Subscribe(workspaceID)
-	defer h.service.notifier.Unsubscribe(workspaceID, signalCh)
-	planSidebarSubs := h.subscribePlanSidebarSignals(userEmail)
-	defer h.unsubscribePlanSidebarSignals(planSidebarSubs)
-	h.service.RequestPiSessionIndex(PiSessionIndexRequest{
-		UserEmail: userEmail,
-		Reason:    "workspace-stream",
-	})
-
-	since := parseSince(c.QueryParam("since"))
-	currentCursor := h.service.CurrentCursor(workspaceID)
-	if workspace.NeedsCatchup(since, currentCursor) {
-		if err := h.patchWorkspaceResource(c, sse); err != nil {
-			return err
-		}
-		since = h.service.CurrentCursor(workspaceID)
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case signal := <-signalCh:
-			if signal.Cursor <= since {
-				continue
-			}
-			if signal.Cursor > since+1 || signal.Scope == PatchWorkspaceResource {
-				if err := h.patchWorkspaceResource(c, sse); err != nil {
-					return err
-				}
-			} else if err := h.patchWorkspace(c, sse, signal.Scope); err != nil {
-				return err
-			}
-			since = signal.Cursor
-		case signal := <-planSidebarChannel(planSidebarSubs, 0):
-			if h.shouldPatchPlanSidebar(planSidebarSubs, 0, signal) {
-				if err := h.patchWorkspacePlanSidebar(c, sse); err != nil {
-					return err
-				}
-			}
-		case signal := <-planSidebarChannel(planSidebarSubs, 1):
-			if h.shouldPatchPlanSidebar(planSidebarSubs, 1, signal) {
-				if err := h.patchWorkspacePlanSidebar(c, sse); err != nil {
-					return err
-				}
-			}
-		}
-	}
-}
-
-func (h *Handler) StreamEmbeddedFreeform(c echo.Context) error {
-	userEmail, ok := c.Get("user_email").(string)
-	if !ok || userEmail == "" {
-		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
-	}
-
-	threadID := strings.TrimSpace(c.QueryParam("thread"))
-	if threadID == "" {
-		return nil
-	}
-
-	sse := datastar.NewSSE(c.Response().Writer, c.Request())
-	ctx := c.Request().Context()
-	signalCh := h.service.notifier.Subscribe(threadID)
-	defer h.service.notifier.Unsubscribe(threadID, signalCh)
-	h.service.RequestPiSessionIndex(PiSessionIndexRequest{
-		UserEmail: userEmail,
-		Reason:    "embedded-freeform-stream",
-	})
-
-	workbenchV2 := c.QueryParam("workbench_v2") == "1"
-	since := parseSince(c.QueryParam("since"))
-	currentCursor := h.service.CurrentCursor(threadID)
-	if since < currentCursor {
-		if workbenchV2 {
-			if err := h.patchEmbeddedFreeformLiveTranscript(
-				c,
-				sse,
-				userEmail,
-			); err != nil {
-				return err
-			}
-		} else if err := h.patchEmbeddedFreeformChatPanel(c, sse, userEmail); err != nil {
-			return err
-		}
-		since = h.service.CurrentCursor(threadID)
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case signal := <-signalCh:
-			if signal.Cursor <= since {
-				continue
-			}
-			switch signal.Scope {
-			case PatchLiveTranscript:
-				if err := h.patchEmbeddedFreeformLiveTranscript(
-					c,
-					sse,
-					userEmail,
-				); err != nil {
-					return err
-				}
-			case PatchStableTranscript:
-				if err := h.patchEmbeddedFreeformStableTranscript(
-					c,
-					sse,
-					userEmail,
-				); err != nil {
-					return err
-				}
-			default:
-				// Incremental default/resource: do not MessagesPane-nest live.
-				if err := h.patchEmbeddedFreeformLiveSafe(c, sse, userEmail); err != nil {
-					return err
-				}
-			}
-			since = signal.Cursor
-		}
-	}
-}
-
 func (h *Handler) StreamEmbeddedThread(c echo.Context) error {
 	userEmail, ok := c.Get("user_email").(string)
 	if !ok || userEmail == "" {
@@ -1037,18 +889,6 @@ func (h *Handler) SendEmbeddedFreeformPrompt(c echo.Context) error {
 	)
 }
 
-func (h *Handler) ResumeEmbeddedFreeformThread(c echo.Context) error {
-	userEmail, ok := c.Get("user_email").(string)
-	if !ok || userEmail == "" {
-		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
-	}
-	threadID := strings.TrimSpace(c.FormValue("thread_id"))
-	if threadID == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "thread_id is required")
-	}
-	return h.resumeEmbeddedFreeformThreadByID(c, userEmail, threadID)
-}
-
 func (h *Handler) resumeEmbeddedFreeformThreadByID(
 	c echo.Context,
 	userEmail, threadID string,
@@ -1154,19 +994,6 @@ func (h *Handler) SendPrompt(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
-func (h *Handler) ResumeThread(c echo.Context) error {
-	userEmail, ok := c.Get("user_email").(string)
-	if !ok || userEmail == "" {
-		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
-	}
-
-	threadID := strings.TrimSpace(c.FormValue("thread_id"))
-	if threadID == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "thread_id is required")
-	}
-	return h.resumeFreeformThreadByID(c, userEmail, threadID)
-}
-
 func (h *Handler) ResumeThreadByPath(c echo.Context) error {
 	userEmail, ok := c.Get("user_email").(string)
 	if !ok || userEmail == "" {
@@ -1205,19 +1032,6 @@ func (h *Handler) resumeFreeformThreadByID(
 	}
 
 	return c.NoContent(http.StatusNoContent)
-}
-
-func (h *Handler) ForkThread(c echo.Context) error {
-	userEmail, ok := c.Get("user_email").(string)
-	if !ok || userEmail == "" {
-		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
-	}
-
-	sourceThreadID := strings.TrimSpace(c.FormValue("source_thread_id"))
-	if sourceThreadID == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "source_thread_id is required")
-	}
-	return h.forkFreeformThreadByID(c, userEmail, sourceThreadID)
 }
 
 func (h *Handler) ForkThreadByPath(c echo.Context) error {
@@ -1716,19 +1530,6 @@ func (h *Handler) attachCurrentDocToEmbeddedChat(
 	)
 }
 
-func (h *Handler) threadRedirectURL(
-	ctx context.Context,
-	userEmail, threadID string,
-) string {
-	workspaceContext, err := h.service.GetThreadWorkspaceContext(ctx, userEmail, threadID)
-	if err == nil {
-		return threadThoughtsURL(workspaceContext)
-	}
-	return BuildThoughtsChatDocURL(
-		EmbeddedChatURLState{Context: ThoughtsChatContext, ThreadID: threadID},
-	)
-}
-
 func (h *Handler) ListThreadSlashCommands(c echo.Context) error {
 	userEmail, ok := c.Get("user_email").(string)
 	if !ok || userEmail == "" {
@@ -1836,63 +1637,6 @@ func (h *Handler) PlanWorkspaceAction(c echo.Context) error {
 	return h.patchWorkspaceResource(c, sse)
 }
 
-func (h *Handler) ResumeWorkspaceThread(c echo.Context) error {
-	userEmail, ok := c.Get("user_email").(string)
-	if !ok || userEmail == "" {
-		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
-	}
-	workspaceID := c.Param("workspace_id")
-	threadID := strings.TrimSpace(c.Param("thread_id"))
-	return h.resumeWorkspaceThreadByID(c, userEmail, workspaceID, threadID)
-}
-
-func (h *Handler) resumeWorkspaceThreadByID(
-	c echo.Context,
-	userEmail, workspaceID, threadID string,
-) error {
-	if _, err := h.service.sharedWorkspaceThread(
-		c.Request().Context(),
-		workspaceID,
-		threadID,
-	); err != nil {
-		status := http.StatusBadRequest
-		if errors.Is(err, sql.ErrNoRows) ||
-			errors.Is(err, ErrThreadWorkspaceMismatch) {
-			status = http.StatusNotFound
-		}
-		return echo.NewHTTPError(status, err.Error())
-	}
-	prompt := chatPromptFromForm(c)
-	if prompt == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "prompt is required")
-	}
-	attachments, err := h.parseAttachedPaths(c)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	turn, err := h.service.AcceptResumeWorkspaceThread(
-		c.Request().Context(),
-		workspaceID,
-		userEmail,
-		threadID,
-		prompt,
-		attachments,
-	)
-	if err != nil {
-		return echo.NewHTTPError(resumeComposeHTTPStatus(err), err.Error())
-	}
-	sse := datastar.NewSSE(c.Response().Writer, c.Request())
-	if err := h.patchLiveTranscriptSendAccept(
-		sse,
-		threadID,
-		workspaceForkAction(workspaceID, threadID),
-	); err != nil {
-		return err
-	}
-	h.startAcceptedTurnAsync(turn)
-	return nil
-}
-
 type threadDraftSignals struct {
 	ChatDraft string `json:"chatDraft"`
 }
@@ -1941,16 +1685,6 @@ func (h *Handler) ResumeEmbeddedThread(c echo.Context) error {
 		return h.resumeEmbeddedFreeformThreadByID(c, userEmail, threadID)
 	}
 	return h.resumeEmbeddedWorkspaceThread(c, userEmail, workspace.ID, threadID)
-}
-
-func (h *Handler) ResumeEmbeddedWorkspaceThread(c echo.Context) error {
-	userEmail, ok := c.Get("user_email").(string)
-	if !ok || userEmail == "" {
-		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
-	}
-	workspaceID := strings.TrimSpace(c.Param("workspace_id"))
-	threadID := strings.TrimSpace(c.Param("thread_id"))
-	return h.resumeEmbeddedWorkspaceThread(c, userEmail, workspaceID, threadID)
 }
 
 func (h *Handler) resumeEmbeddedWorkspaceThread(
@@ -2050,16 +1784,6 @@ func (h *Handler) resumeEmbeddedWorkspaceThread(
 	}
 	h.startAcceptedTurnAsync(turn)
 	return nil
-}
-
-func (h *Handler) ForkWorkspaceThread(c echo.Context) error {
-	userEmail, ok := c.Get("user_email").(string)
-	if !ok || userEmail == "" {
-		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
-	}
-	workspaceID := c.Param("workspace_id")
-	sourceThreadID := strings.TrimSpace(c.Param("thread_id"))
-	return h.forkWorkspaceThreadByID(c, userEmail, workspaceID, sourceThreadID)
 }
 
 func (h *Handler) forkWorkspaceThreadByID(
@@ -2961,10 +2685,6 @@ func threadThoughtsChatURL(threadID, runID string) string {
 	return "/thoughts/?" + values.Encode()
 }
 
-func workspaceThreadURL(workspaceID, threadID, runID string) string {
-	return threadThoughtsChatURL(threadID, runID)
-}
-
 func workspaceThreadURLForRequest(
 	c echo.Context,
 	workspaceID, threadID, runID string,
@@ -3010,51 +2730,6 @@ func (h *Handler) patchWorkspaceResource(
 	}
 	args.Workbench = workbenchState
 	return sse.PatchElementTempl(WorkspaceResource(*args))
-}
-
-func (h *Handler) patchWorkspacePlanSidebar(
-	c echo.Context,
-	sse *datastar.ServerSentEventGenerator,
-) error {
-	userEmail, ok := c.Get("user_email").(string)
-	if !ok || userEmail == "" {
-		return nil
-	}
-	args, err := h.service.BuildWorkspacePageArgs(
-		c.Request().Context(),
-		h.workspacePatchInput(c, userEmail),
-	)
-	if err != nil {
-		return err
-	}
-	return sse.PatchElementTempl(
-		workbench.SharedSidebar(BuildAgentChatWorkspaceSidebarArgs(*args)),
-		datastar.WithSelectorID("agent-chat-shared-sidebar"),
-	)
-}
-
-func (h *Handler) patchWorkspaceLiveTranscript(
-	c echo.Context,
-	sse *datastar.ServerSentEventGenerator,
-) error {
-	userEmail, ok := c.Get("user_email").(string)
-	if !ok || userEmail == "" {
-		return nil
-	}
-	state, threadID, err := h.service.BuildWorkspaceLiveTranscriptState(
-		c.Request().Context(),
-		h.workspacePatchInput(c, userEmail),
-	)
-	if err != nil {
-		return err
-	}
-	return sse.PatchElementTempl(
-		LiveTranscriptRegion(
-			threadID,
-			state,
-			workspaceForkAction(c.Param("workspace_id"), threadID),
-		),
-	)
 }
 
 func (h *Handler) patchEmbeddedFreeformChatPanel(
@@ -3216,26 +2891,6 @@ func (h *Handler) patchEmbeddedFreeformLiveSafe(
 	userEmail string,
 ) error {
 	return h.patchEmbeddedFreeformStableTranscript(c, sse, userEmail)
-}
-
-func (h *Handler) patchWorkspace(
-	c echo.Context,
-	sse *datastar.ServerSentEventGenerator,
-	scope WorkspacePatchScope,
-) error {
-	switch scope {
-	case PatchLiveTranscript:
-		return h.patchWorkspaceLiveTranscript(c, sse)
-	default:
-		return h.patchWorkspaceResource(c, sse)
-	}
-}
-
-func (h *Handler) patchWorkspaceCatchup(
-	c echo.Context,
-	sse *datastar.ServerSentEventGenerator,
-) error {
-	return h.patchWorkspaceResource(c, sse)
 }
 
 func (h *Handler) workspacePatchInput(
@@ -3401,5 +3056,3 @@ func (h *Handler) patchThread(
 		return patchMessages()
 	}
 }
-
-func (h *Handler) SelectArtifact(c echo.Context) error { return h.SelectDoc(c) }

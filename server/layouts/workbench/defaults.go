@@ -11,10 +11,6 @@ const (
 	defaultMinRem               = 12
 )
 
-func DefaultWorkbenchLayout(page WorkbenchPage) WorkbenchLayoutMode {
-	return WorkbenchWorkspaceDocChat
-}
-
 func DefaultWorkbenchConfig(
 	page WorkbenchPage,
 	view WorkbenchView,

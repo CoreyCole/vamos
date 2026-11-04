@@ -1,64 +1,7 @@
 package agentchat
 
-import (
-	"strconv"
-
-	"github.com/CoreyCole/vamos/pkg/datastarui/components/sheet"
-)
-
-templ ChatThreadFamilyBar(family ChatThreadFamily) {
-	if len(family.Rows) > 0 {
-		<div
-			id={ agentChatThreadFamilyID }
-			data-testid="agent-chat-thread-family"
-			class="shrink-0 border-b border-border bg-background px-3 py-2"
-		>
-			<div class="hidden md:block">
-				<details class="group">
-					<summary class="flex min-h-9 cursor-pointer list-none items-center gap-2 text-sm text-foreground [&::-webkit-details-marker]:hidden">
-						<span class="font-medium">Threads</span>
-						<span class="text-muted-foreground">({ strconv.Itoa(len(family.Rows)) })</span>
-						<span class="min-w-0 truncate text-muted-foreground">{ family.SelectedTitle() }</span>
-					</summary>
-					@ChatThreadFamilyList(family)
-				</details>
-			</div>
-			<div class="md:hidden">
-				@sheet.SheetTrigger(sheet.SheetTriggerArgs{
-					SheetID: agentChatThreadFamilySheetID,
-					Class:   "flex min-h-9 w-full items-center gap-2 rounded-md border border-border px-3 text-left text-sm",
-				}) {
-					<span class="font-medium">Threads</span>
-					<span class="text-muted-foreground">({ strconv.Itoa(len(family.Rows)) })</span>
-					<span class="min-w-0 truncate text-muted-foreground">{ family.SelectedTitle() }</span>
-				}
-				@sheet.Sheet(sheet.SheetArgs{
-					ID:    agentChatThreadFamilySheetID,
-					Modal: true,
-					Side:  "bottom",
-				}) {
-					@sheet.SheetContent(sheet.SheetContentArgs{SheetID: agentChatThreadFamilySheetID, Class: "overflow-y-auto"}) {
-						@sheet.SheetHeader(sheet.SheetHeaderArgs{}) {
-							@sheet.SheetTitle(sheet.SheetTitleArgs{}) {
-								Room threads
-							}
-						}
-						@ChatThreadFamilySheetList(family)
-					}
-				}
-			</div>
-		</div>
-	}
-}
-
 templ ChatThreadFamilyList(family ChatThreadFamily) {
 	<nav id={ agentChatThreadFamilyListID } class="mt-2 space-y-0.5" aria-label="Room threads">
-		@chatThreadFamilyListBody(family)
-	</nav>
-}
-
-templ ChatThreadFamilySheetList(family ChatThreadFamily) {
-	<nav id="agent-chat-thread-family-list-sheet" class="space-y-0.5" aria-label="Room threads">
 		@chatThreadFamilyListBody(family)
 	</nav>
 }

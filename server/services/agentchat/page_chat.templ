@@ -1,35 +1,6 @@
 package agentchat
 
-import (
-	"fmt"
-
-	"github.com/CoreyCole/vamos/server/layouts"
-	"github.com/CoreyCole/vamos/server/layouts/workbench"
-)
-
-templ ChatPage(args ChatPageArgs) {
-	@layouts.Root(layouts.RootArgs{
-		Title:              "Agent Chat",
-		PageType:           layouts.PageTypeAgentChat,
-		ShowHeader:         true,
-		UserEmail:          args.UserEmail,
-		CurrentTheme:       args.CurrentTheme,
-		CurrentSyntaxTheme: args.CurrentSyntaxTheme,
-	}) {
-		<div data-init={ fmt.Sprintf("@get('/agent-chat/sessions/stream?current_thread=%s')", getThreadID(args.CurrentThread)) }></div>
-		if args.CurrentThread != nil {
-			<div data-init={ fmt.Sprintf("@get('/agent-chat/thread/%s/stream?run=%s&since=%d')", args.CurrentThread.ID, getRunID(args.ActiveRun), args.Cursor) }></div>
-		}
-		<div id="agent-chat-workbench-shell" data-signals={ chatShellSignalsForPlanSidebar(args.CurrentThread != nil, args.PlanSidebar) } class="relative h-full min-h-0 overflow-hidden">
-			@AgentChatToast()
-			@workbench.Workbench(ensureFreeformWorkbenchState(args))
-		</div>
-	}
-}
-
-templ FreeformNavigationRegion(args ChatPageArgs) {
-	@PlanSidebar(args.PlanSidebar)
-}
+import "github.com/CoreyCole/vamos/server/layouts/workbench"
 
 templ FreeformChatPrimaryRegion(args ChatPageArgs) {
 	<main class="relative flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-card">
@@ -73,23 +44,4 @@ templ WorkspaceChatPrimaryRegion(args WorkspacePageArgs) {
 			@WorkspaceComposer(args.WorkspaceID, getThreadID(args.Projection.SelectedThread), args.Projection.SelectedThread != nil, "", args.PendingAttachments)
 		</div>
 	</main>
-}
-
-templ WorkspaceChatPage(args WorkspacePageArgs) {
-	@layouts.Root(layouts.RootArgs{
-		Title:              "Agent Chat",
-		PageType:           layouts.PageTypeAgentChat,
-		ShowHeader:         true,
-		UserEmail:          args.UserEmail,
-		CurrentTheme:       args.CurrentTheme,
-		CurrentSyntaxTheme: args.CurrentSyntaxTheme,
-	}) {
-		if args.Projection.SelectedThread != nil {
-			<div data-init={ fmt.Sprintf("@get('/agent-chat/thread/%s/stream?run=%s&since=%d')", getThreadID(args.Projection.SelectedThread), getRunID(args.Projection.ActiveRun), args.Cursor) }></div>
-		}
-		<div id="agent-chat-workspace-shell" data-signals={ workspaceShellSignals(args.Projection.SelectedThread != nil, args.Projection.PlanSidebar) } class="relative h-full min-h-0 overflow-hidden">
-			@AgentChatToast()
-			@WorkspaceResource(args)
-		</div>
-	}
 }

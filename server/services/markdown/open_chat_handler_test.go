@@ -4,9 +4,7 @@
 package markdown
 
 import (
-	"bytes"
 	"context"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -263,30 +261,4 @@ func (s stubWorkbenchThreads) RenderSharedThreadChat(
 	_ = threadID
 	_ = userEmail
 	return templ.NopComponent, nil
-}
-
-func TestThoughtsContextPanelRendersEmbeddedChatComponent(t *testing.T) {
-	t.Parallel()
-
-	component := templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
-		_, err := w.Write(
-			[]byte(`<div id="embedded-chat-test">Embedded chat content</div>`),
-		)
-		return err
-	})
-	var body bytes.Buffer
-	if err := ThoughtsContextPanel(ThoughtsContextArgs{
-		Mode:      thoughtsContextModeChat,
-		PageArgs:  &PageArgs{FilePath: "thoughts/user/doc.md"},
-		Component: component,
-	}).Render(t.Context(), &body); err != nil {
-		t.Fatalf("Render() error = %v", err)
-	}
-	got := body.String()
-	if !strings.Contains(got, "embedded-chat-test") {
-		t.Fatalf("body missing embedded component: %s", got)
-	}
-	if strings.Contains(got, "Open Chat") {
-		t.Fatalf("body contains Open Chat fallback: %s", got)
-	}
 }

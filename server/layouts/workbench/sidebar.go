@@ -142,18 +142,6 @@ func NewFilesPanelModel(
 	}
 }
 
-func NewDocumentPanelModel(
-	currentPath string,
-	toc []DocumentTOCItem,
-	sections []DocumentSectionItem,
-) DocumentPanelModel {
-	return DocumentPanelModel{
-		CurrentPath: currentPath,
-		TOC:         toc,
-		Sections:    sections,
-	}
-}
-
 func NormalizeSidebarDefault(args WorkbenchSidebarArgs) SidebarTabKind {
 	for _, tab := range args.Tabs {
 		if tab.Kind == args.DefaultTab && tab.Available {
@@ -172,7 +160,7 @@ func SidebarSignals(args WorkbenchSidebarArgs) string {
 	return "{sidebarActiveTab: '" + string(NormalizeSidebarDefault(args)) + "'}"
 }
 
-func SidebarPanelInitialClass(active SidebarTabKind, panel SidebarTabKind) string {
+func SidebarPanelInitialClass(active, panel SidebarTabKind) string {
 	if active == panel {
 		return ""
 	}
@@ -193,7 +181,9 @@ func sidebarTabActiveClass(kind SidebarTabKind) string {
 }
 
 func sidebarTabClick(kind SidebarTabKind) string {
-	expr := "$sidebarActiveTab = '" + string(kind) + "'; el.closest('#workbench-root')?.dispatchEvent(new CustomEvent('workbench-state-changed', { bubbles: true }))"
+	expr := "$sidebarActiveTab = '" + string(
+		kind,
+	) + "'; el.closest('#workbench-root')?.dispatchEvent(new CustomEvent('workbench-state-changed', { bubbles: true }))"
 	if kind != SidebarTabFiles {
 		return expr
 	}

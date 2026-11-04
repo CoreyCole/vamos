@@ -88,8 +88,7 @@ func TestThreadsToggleHotkeyActionUsesCtrlB(t *testing.T) {
 			t.Fatalf("hotkey missing %q: %s", want, got)
 		}
 	}
-	if !strings.Contains(ThreadsHideControlTitle(), "Ctrl+B") ||
-		!strings.Contains(ThreadsShowControlTitle(), "Ctrl+B") {
+	if !strings.Contains(ThreadsHideControlTitle(), "Ctrl+B") {
 		t.Fatal("tooltips must show Ctrl+B")
 	}
 }

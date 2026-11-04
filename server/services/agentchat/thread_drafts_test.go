@@ -554,45 +554,6 @@ func TestResetAndFocusEmbeddedComposerPatchesAcceptedDraft(t *testing.T) {
 		t.Fatalf("embedded composer reset must not ExecuteScript: %s", body)
 	}
 }
-
-func TestResumeEmbeddedWorkspaceThreadRejectedRetainsDraft(t *testing.T) {
-	service, queries := newThreadDraftService(t)
-	createDraftThread(t, queries, "thread_1")
-	if err := service.SaveThreadDraft(
-		t.Context(),
-		"owner@example.com",
-		"thread_1",
-		"keep this",
-		nextDraftOperationOrder(),
-	); err != nil {
-		t.Fatal(err)
-	}
-	handler := NewHandler(service, nil)
-	values := url.Values{"prompt": {"send this"}}
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/agent-chat/workspace_missing/thread/thread_1/resume",
-		strings.NewReader(values.Encode()),
-	)
-	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
-	rec := httptest.NewRecorder()
-	ctx := echo.New().NewContext(req, rec)
-	ctx.SetParamNames("workspace_id", "thread_id")
-	ctx.SetParamValues("workspace_missing", "thread_1")
-	ctx.Set("user_email", "owner@example.com")
-	if err := handler.ResumeEmbeddedWorkspaceThread(ctx); err == nil {
-		t.Fatal("expected workspace rejection")
-	}
-	if strings.Contains(rec.Body.String(), "chatDraft") ||
-		strings.Contains(rec.Body.String(), "reset") {
-		t.Fatalf("rejection mutated composer: %s", rec.Body.String())
-	}
-	draft, err := service.GetThreadDraft(t.Context(), "owner@example.com", "thread_1")
-	if err != nil || draft != "keep this" {
-		t.Fatalf("draft = %q, %v", draft, err)
-	}
-}
-
 func TestSaveThreadDraftRuntimeRoute(t *testing.T) {
 	e := echo.New()
 	NewHandler(&Service{}, nil).RegisterRuntimeRoutes(e.Group("/agent-chat"))

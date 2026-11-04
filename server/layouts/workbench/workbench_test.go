@@ -66,21 +66,6 @@ func TestResolveViewportClassUsesHeaderThenUAFallback(t *testing.T) {
 	}
 }
 
-func TestDefaultWorkbenchLayoutUsesWorkspaceDocChat(t *testing.T) {
-	t.Parallel()
-
-	for _, page := range []WorkbenchPage{WorkbenchPageAgentChat, WorkbenchPageThoughts} {
-		if got := DefaultWorkbenchLayout(page); got != WorkbenchWorkspaceDocChat {
-			t.Fatalf(
-				"DefaultWorkbenchLayout(%q) = %q, want %q",
-				page,
-				got,
-				WorkbenchWorkspaceDocChat,
-			)
-		}
-	}
-}
-
 func TestDefaultWorkbenchConfigAgentChatWorkspaceDocChat(t *testing.T) {
 	t.Parallel()
 
@@ -817,7 +802,6 @@ func TestAgentChatScrollUsesSSRLatestAnchor(t *testing.T) {
 	}
 	for _, rel := range []string{
 		"../../../server/services/agentchat/workbench_threads.templ",
-		"../../../server/services/agentchat/shell.templ",
 		"../../../server/services/agentchat/page_chat.templ",
 		"../../../server/services/agentchat/embedded_chat.templ",
 	} {
@@ -835,14 +819,6 @@ func TestAgentChatScrollUsesSSRLatestAnchor(t *testing.T) {
 		}
 	}
 
-	shellBody, err := os.ReadFile("../../../server/services/agentchat/shell.templ")
-	if err != nil {
-		t.Fatalf("ReadFile(shell.templ) error = %v", err)
-	}
-	if !strings.Contains(string(shellBody), "chat-latest") ||
-		!strings.Contains(string(shellBody), "queueMicrotask") {
-		t.Fatalf("shell.templ Chat tab missing queueMicrotask chat-latest focus")
-	}
 	signalsBody, err := os.ReadFile("../../../server/layouts/workbench/signals.go")
 	if err != nil {
 		t.Fatalf("ReadFile(signals.go) error = %v", err)

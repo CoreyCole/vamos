@@ -258,19 +258,6 @@ func (args *DirectoryArgs) BuildRootArgs() layouts.RootArgs {
 	}
 }
 
-// DirectoryTitle is the icon-free title for directory center headers.
-func DirectoryTitle(path string) string {
-	if path == "" {
-		return "Documentation Root"
-	}
-	return path
-}
-
-// GetDisplayPath is a helper function to get display path for directory listings.
-func GetDisplayPath(path string) string {
-	return DirectoryTitle(path)
-}
-
 // getTitle creates a display title from a file path
 func getTitle(filePath string) string {
 	parts := GetPathParts(filePath)

@@ -171,12 +171,8 @@ func TestMarkdownWorkbenchContextClosedByDefaultAndCommentsOpen(t *testing.T) {
 					Kind:     kind,
 					Visible:  visible,
 					TargetID: "thoughts-context-region",
-					Component: ThoughtsContextPanel(
-						ThoughtsContextArgs{
-							Mode:      contextMode,
-							PageArgs:  args,
-							CommentUI: args.CommentUI,
-						},
+					Component: commentui.CommentsContextPanel(
+						commentui.BuildCommentsPanelArgs(args.CommentUI, ""),
 					),
 				},
 			},
@@ -274,80 +270,6 @@ func TestMarkdownPageHidesWorkspaceOwnershipText(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-//nolint:paralleltest // templ component rendering uses shared Tailwind merge state in tests.
-func TestDirectoryWorkbenchPageRendersSharedSidebarAndDirectoryAnchors(t *testing.T) {
-	args := &DirectoryArgs{
-		Path:      "thoughts/creative-mode-agent/plans",
-		UserEmail: "user@example.com",
-		Items: []DirectoryItem{
-			{
-				Name:  "plan-a",
-				Path:  "creative-mode-agent/plans/plan-a/",
-				IsDir: true,
-			},
-			{
-				Name: "design.md",
-				Path: "creative-mode-agent/plans/plan-a/design.md",
-			},
-		},
-	}
-	state, err := workbench.BuildWorkbenchState(workbench.BuildWorkbenchStateInput{
-		UserEmail:  args.UserEmail,
-		Page:       workbench.WorkbenchPageThoughts,
-		View:       workbench.WorkbenchViewFocus,
-		ActivePath: args.Path,
-		Regions: []workbench.WorkbenchRegion{
-			{
-				ID:        "thoughts-document",
-				Slot:      workbench.WorkbenchSlotPrimary,
-				Kind:      workbench.RegionDocument,
-				Visible:   true,
-				TargetID:  "thoughts-directory-region",
-				Component: DirectoryPrimaryPanel(args),
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("BuildWorkbenchState() error = %v", err)
-	}
-
-	var buf bytes.Buffer
-	if err := DirectoryWorkbenchPage(
-		DirectoryWorkbenchArgs{Directory: args, Workbench: state},
-	).Render(t.Context(), &buf); err != nil {
-		t.Fatalf("Render() error = %v", err)
-	}
-	html := buf.String()
-	for _, want := range []string{
-		`id="workbench-root"`,
-		`id="thoughts-directory-region"`,
-		`id="thoughts-directory-primary"`,
-		`id="thoughts-directory-scroll-region"`,
-		`href="/thoughts/creative-mode-agent/plans/plan-a"`,
-		`href="/thoughts/creative-mode-agent/plans/plan-a/design.md"`,
-	} {
-		if !strings.Contains(html, want) {
-			t.Fatalf("DirectoryWorkbenchPage render missing %q in %s", want, html)
-		}
-	}
-	for _, unwanted := range []string{
-		`action="/thoughts/actions/select-directory"`,
-		`data-on:submit="@post(&#39;/thoughts/actions/select-directory&#39;, {contentType: &#39;form&#39;})"`,
-		`name="dir_path"`,
-		`action="/thoughts/actions/select-document"`,
-		`data-on:submit="@post(&#39;/thoughts/actions/select-document&#39;, {contentType: &#39;form&#39;})"`,
-		`name="doc_path"`,
-		`$sidebarActiveTab = &#39;document&#39;`,
-		`$sidebarActiveTab = 'document'`,
-		`mx-auto max-w-4xl rounded-lg border border-border bg-card`,
-		`shadow-sm md:p-6`,
-	} {
-		if strings.Contains(html, unwanted) {
-			t.Fatalf("directory workbench kept unwanted chrome %q: %s", unwanted, html)
-		}
 	}
 }
 

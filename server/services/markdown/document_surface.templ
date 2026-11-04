@@ -35,12 +35,6 @@ templ DocumentSurface(doc WorkbenchDocument) {
 	</div>
 }
 
-templ ThoughtsTitleContent(title string) {
-	if title != "" {
-		<p class="truncate text-sm font-medium text-foreground">{ title }</p>
-	}
-}
-
 templ DocumentOnlyCommentSurface(component templ.Component, comments commentui.CommentableMarkdownArgs) {
 	<div class={ documentOnlyCommentSurfaceClass(comments.DocPath) } data-commentui-container="true">
 		@component
@@ -89,45 +83,6 @@ templ QRSPIArtifactContext(meta QRSPIMetadata) {
 	}
 }
 
-templ DocumentActions(actions []DocumentAction) {
-	<div id="document-header-actions" class="flex shrink-0 items-center justify-end gap-2">
-		for _, action := range actions {
-			@DocumentActionControl(action)
-		}
-	</div>
-}
-
-templ DocumentActionControl(action DocumentAction) {
-	{{ label := documentActionLabel(action) }}
-	if action.Href != "" {
-		<a href={ templ.URL(action.Href) } class={ documentActionButtonClass(action) } aria-label={ label } title={ label }>{ documentActionIcon(action) }</a>
-	} else if action.FormAction != "" {
-		<form method="post" action={ action.FormAction } data-on:submit={ "@post('" + action.FormAction + "', {contentType: 'form'})" }>
-			for name, value := range action.HiddenFields {
-				<input type="hidden" name={ name } value={ value }/>
-			}
-			<button type="submit" class={ documentActionButtonClass(action) } aria-label={ label } title={ label }>{ documentActionIcon(action) }</button>
-		</form>
-	}
-}
-
-func isDocumentChatAction(action DocumentAction) bool {
-	return action.FormAction == "/thoughts/chat/open" || action.FormAction == "/thoughts/actions/open-chat"
-}
-
-func isDocumentCommentsAction(action DocumentAction) bool {
-	return action.FormAction == "/thoughts/actions/open-comments" || strings.EqualFold(action.Label, "Comments") || strings.Contains(action.Href, "context=comments")
-}
-
-func hasOpenChatAction(actions []DocumentAction) bool {
-	for _, action := range actions {
-		if isDocumentChatAction(action) {
-			return true
-		}
-	}
-	return false
-}
-
 func documentScrollRegionClass(kind DocumentKind) string {
 	switch kind {
 	case DocumentKindHTMLApplet:
@@ -147,36 +102,5 @@ func documentOnlyCommentSurfaceClass(docPath string) string {
 		return "relative flex min-h-0 min-w-0 flex-1 flex-col"
 	default:
 		return "relative h-full min-h-full min-w-0"
-	}
-}
-
-func documentActionButtonClass(action DocumentAction) string {
-	return "inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-}
-
-func documentActionLabel(action DocumentAction) string {
-	if strings.TrimSpace(action.AriaLabel) != "" {
-		return strings.TrimSpace(action.AriaLabel)
-	}
-	return strings.TrimSpace(action.Label)
-}
-
-templ OpenChatComposerAttachments(docPath string) {
-	<div id="agent-chat-composer-attachments">
-		<input type="hidden" name="attached_paths[]" value={ docPath }/>
-		<div class="agent-chat-content-padding flex flex-wrap gap-1 pt-3">
-			<span class="rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground">{ filepath.Base(docPath) }</span>
-		</div>
-	</div>
-}
-
-func documentActionIcon(action DocumentAction) string {
-	switch action.Icon {
-	case "chat":
-		return "💬"
-	case "comments":
-		return "☰"
-	default:
-		return action.Label
 	}
 }

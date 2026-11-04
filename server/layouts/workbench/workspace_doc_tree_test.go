@@ -6,27 +6,6 @@ import (
 	"testing"
 )
 
-func TestWorkspaceDocNodeHrefUsesThoughtsForAllEntryModes(t *testing.T) {
-	if got := WorkspaceDocNodeHref(
-		DocEntryModeThoughts,
-		"owner/plan/design doc.md",
-	); got != "/thoughts/owner/plan/design%20doc.md" {
-		t.Fatalf("thoughts href = %q", got)
-	}
-	if got := WorkspaceDocNodeHref(
-		DocEntryModeAgentChat,
-		"owner/plan/design.md",
-	); got != "/thoughts/owner/plan/design.md" {
-		t.Fatalf("agent chat mode href = %q", got)
-	}
-	if got := WorkspaceDocNodeHref(
-		DocEntryModeThoughts,
-		"thoughts/owner/plan/design.md",
-	); got != "/thoughts/owner/plan/design.md" {
-		t.Fatalf("prefixed thoughts href = %q", got)
-	}
-}
-
 func TestWorkspaceDocTreeRendersDirectoryButtonsAndFileAnchors(t *testing.T) {
 	args := WorkspaceDocTreeArgs{
 		WorkspaceID: "ws-1",

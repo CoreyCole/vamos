@@ -1,8 +1,6 @@
 package workbench
 
 import (
-	"net/url"
-	"path"
 	"strings"
 )
 
@@ -31,20 +29,6 @@ type WorkspaceDocNode struct {
 	IsActive   bool
 	IsExpanded bool
 	Children   []WorkspaceDocNode
-}
-
-func WorkspaceDocNodeHref(mode DocEntryMode, docPath string) string {
-	_ = mode
-	trimmed := strings.Trim(strings.TrimSpace(docPath), "/")
-	trimmed = strings.TrimPrefix(trimmed, "thoughts/")
-	if trimmed == "" {
-		return "#"
-	}
-	parts := strings.Split(path.Clean(trimmed), "/")
-	for i, part := range parts {
-		parts[i] = url.PathEscape(part)
-	}
-	return "/thoughts/" + strings.Join(parts, "/")
 }
 
 func WorkspaceDocNodeToggleSignal(node WorkspaceDocNode) string {

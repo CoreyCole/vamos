@@ -19,36 +19,11 @@ func BuildAgentChatSidebarArgs(args ChatPageArgs) workbench.WorkbenchSidebarArgs
 	}
 }
 
-func BuildAgentChatWorkspaceSidebarArgs(
-	args WorkspacePageArgs,
-) workbench.WorkbenchSidebarArgs {
-	return workbench.WorkbenchSidebarArgs{
-		ID:         "agent-chat-shared-sidebar",
-		DefaultTab: workbench.SidebarTabWorkspaces,
-		Tabs:       workbench.DefaultSidebarTabs(),
-		Workspaces: workspacesPanelFromWorkspaceProjection(args.Projection),
-		Files: filesPanelFromArtifactTree(
-			documentPanelFromArtifact(args.Projection.Docs),
-			args.Projection.Docs,
-		),
-	}
-}
-
 func workspacesPanelFromChatArgs(args ChatPageArgs) workbench.WorkspacesPanelModel {
 	model := workbench.WorkspacesPanelModel{EmptyLabel: "No sessions yet."}
 	model.Roots = planSidebarRoots(args.PlanSidebar.Nodes)
 	model.ThreadGroups = threadSidebarGroups(args.ThreadGroups)
 	return model
-}
-
-func workspacesPanelFromWorkspaceProjection(
-	projection WorkspaceProjection,
-) workbench.WorkspacesPanelModel {
-	return workbench.WorkspacesPanelModel{
-		Roots:        planSidebarRoots(projection.PlanSidebar.Nodes),
-		ThreadGroups: threadSidebarGroups(projection.Sidebar.Groups),
-		EmptyLabel:   "No workspace sessions yet.",
-	}
 }
 
 func planSidebarRoots(nodes []PlanSidebarNode) []workbench.WorkspaceRootItem {

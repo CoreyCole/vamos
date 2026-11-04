@@ -8,11 +8,7 @@ import (
 	"github.com/CoreyCole/vamos/pkg/db"
 )
 
-const (
-	agentChatThreadFamilyID      = "agent-chat-thread-family"
-	agentChatThreadFamilyListID  = "agent-chat-thread-family-list"
-	agentChatThreadFamilySheetID = "agent-chat-thread-family-sheet"
-)
+const agentChatThreadFamilyListID = "agent-chat-thread-family-list"
 
 type ChatThreadFamilyRow struct {
 	ID       string

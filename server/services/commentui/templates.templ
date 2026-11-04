@@ -390,57 +390,6 @@ templ CommentTargetWithForm(args CommentTargetView, view CommentFormView) {
 	</div>
 }
 
-templ CommentsSidebar(view CommentSidebarView) {
-	<aside
-		id={ view.ID }
-		class={ commentSidebarClass(view.InitiallyExpanded) }
-		data-class={ "{'w-80': $" + view.SignalName + ", 'w-10': !$" + view.SignalName + "}" }
-	>
-		<span class="sr-only">Comments</span>
-		<div id={ view.ID + "-minimized" } data-show={ "!$" + view.SignalName }>
-			@MinimizedCommentRail(view)
-		</div>
-		<div id={ view.ID + "-expanded" } data-show={ "$" + view.SignalName }>
-			@ExpandedCommentSidebar(view)
-		</div>
-	</aside>
-}
-
-templ MinimizedCommentRail(view CommentSidebarView) {
-	<button
-		type="button"
-		class="inline-flex w-8 flex-col items-center gap-1 rounded-md border border-border bg-background/95 p-1 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
-		data-on:click={ "$" + view.SignalName + " = true" }
-		data-attr:aria-expanded={ "$" + view.SignalName + " ? 'true' : 'false'" }
-		aria-controls={ view.ID + "-expanded" }
-		aria-label="Expand comments"
-		title="Expand comments"
-	>
-		if len(view.Threads) == 0 {
-			<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path></svg>
-		} else {
-			@StackedCommentAvatars(commentAuthorsView(view.Threads, 3), "h-6 w-6 text-[10px]")
-		}
-		<span class="sr-only">Expand comments</span>
-	</button>
-}
-
-templ ExpandedCommentSidebar(view CommentSidebarView) {
-	<div class="space-y-3 rounded-xl bg-background/95 p-3 shadow-sm ring-1 ring-border/50">
-		<div class="flex items-center justify-between gap-2">
-			<div class="min-w-0">
-				<p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Comments</p>
-				<p class="text-[11px] text-muted-foreground">{ fmt.Sprintf("%d total", totalThreadCount(view.Threads)) }</p>
-			</div>
-			<button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" data-on:click={ "$" + view.SignalName + " = false" } data-attr:aria-expanded={ "$" + view.SignalName + " ? 'true' : 'false'" } aria-controls={ view.ID + "-expanded" } aria-label="Minimize comments" title="Minimize comments">
-				<span class="sr-only">Minimize comments</span>
-				<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-			</button>
-		</div>
-		@SidebarThreadList(view)
-	</div>
-}
-
 templ StackedCommentAvatars(view CommentAuthorsView, avatarClass string) {
 	<span class="inline-flex items-center -space-x-1" aria-hidden="true">
 		for _, author := range view.DisplayAuthors {
@@ -466,30 +415,6 @@ templ CompactCommentMarker(args CommentTargetView) {
 		@StackedCommentAvatars(authors, "h-6 w-6 text-[10px]")
 		<span class="ml-2 tabular-nums">{ fmt.Sprintf("%d", authors.TotalCount) }</span>
 	</button>
-}
-
-templ SidebarThreadList(view CommentSidebarView) {
-	if len(view.Threads) == 0 {
-		<p class="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">No comments yet.</p>
-	} else {
-		<div class="space-y-3">
-			for _, thread := range unresolvedThreads(view.Threads) {
-				@CommentCard(thread, sidebarThreadTarget(view.Target, thread))
-			}
-			for _, thread := range resolvedThreads(view.Threads) {
-				@SidebarResolvedThreadChip(thread, sidebarThreadTarget(view.Target, thread))
-			}
-		</div>
-	}
-}
-
-templ SidebarResolvedThreadChip(thread CommentThreadView, target CommentTargetView) {
-	{{ _ = target }}
-	<div class="flex items-center gap-2 rounded-md border border-border/70 bg-muted/30 px-2 py-1.5 text-xs text-muted-foreground">
-		<span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-[10px] font-medium text-emerald-200">✓</span>
-		<span class="min-w-0 flex-1 truncate">{ commentDisplayName(thread) }</span>
-		<span class="text-[11px] text-emerald-200">Archived</span>
-	</div>
 }
 
 templ SectionMenu(args CommentTargetView) {
@@ -594,19 +519,6 @@ templ CommentToggle(args CommentTargetView) {
 			}
 		</div>
 	}
-}
-
-templ CommentToggleWithForm(args CommentTargetView, view CommentFormView) {
-	<div class={ CommentAnchorClass(args.SignalKey) + " z-[100]" }>
-		<div class={ CommentPopoverClass(CommentPopoverPlacementTarget) + " ring-1 ring-primary/30" }>
-			@CommentForm(view)
-			if args.Surface == CommentSurfaceArtifact {
-				for _, thread := range args.Threads {
-					@CommentCard(thread, args)
-				}
-			}
-		</div>
-	</div>
 }
 
 templ CommentForm(view CommentFormView) {
@@ -714,14 +626,6 @@ templ MobileSectionCommentTarget() {
 	<div id={ MobileSectionCommentContentID }>
 		<div class="py-4 text-center text-muted-foreground">
 			<p class="text-sm">Select a section to add or view comments</p>
-		</div>
-	</div>
-}
-
-templ WorkbenchMobileCommentsTarget() {
-	<div id={ WorkbenchMobileCommentsContentID }>
-		<div class="py-4 text-center text-muted-foreground">
-			<p class="text-sm">Open comments to add or view discussion</p>
 		</div>
 	</div>
 }

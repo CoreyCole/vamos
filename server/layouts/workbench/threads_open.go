@@ -86,10 +86,6 @@ func ThreadsHideControlTitle() string {
 	return "Hide roster sidebar (Ctrl+B)"
 }
 
-func ThreadsShowControlTitle() string {
-	return "Show roster sidebar (Ctrl+B)"
-}
-
 func ThreadsToggleControlTitle() string {
 	return "Roster sidebar (Ctrl+B)"
 }

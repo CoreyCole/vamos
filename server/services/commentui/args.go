@@ -122,16 +122,7 @@ const (
 	WorkbenchMobileCommentsThreadListID = "workbench-v2-mobile-comments-thread-list"
 	WorkbenchMobileCommentsComposerID   = "workbench-v2-mobile-comments-composer"
 	WorkbenchMobileCommentsFormID       = "workbench-v2-mobile-comment-form"
-	CommentSidebarSignal                = "commentSidebarExpanded"
 )
-
-type CommentSidebarView struct {
-	ID                string
-	SignalName        string
-	InitiallyExpanded bool
-	Threads           []CommentThreadView
-	Target            CommentTargetView
-}
 
 type CommentAuthorsView struct {
 	Authors        []string
@@ -419,47 +410,6 @@ func DocumentTargetView(
 	}
 }
 
-func BuildCommentSidebarView(args CommentableMarkdownArgs) CommentSidebarView {
-	target := CommentTargetView{
-		ID:        TargetID(args.IDPrefix, "document"),
-		SignalKey: SignalKey(args.IDPrefix, "document"),
-		Surface:   args.Surface,
-		DocPath:   args.DocPath,
-		SectionID: "document",
-		UserEmail: args.UserEmail,
-		Threads:   args.Comments,
-		Routes:    args.Routes,
-		HiddenFields: MergeHidden(
-			args.HiddenFields,
-			map[string]string{"section_hint": "document", "heading_hint": ""},
-		),
-	}
-	return CommentSidebarView{
-		ID:                "comment-sidebar",
-		SignalName:        CommentSidebarSignal,
-		InitiallyExpanded: hasUnresolvedThreads(args.Comments),
-		Threads:           args.Comments,
-		Target:            target,
-	}
-}
-
-func hasUnresolvedThreads(threads []CommentThreadView) bool {
-	for _, thread := range threads {
-		if !thread.Resolved {
-			return true
-		}
-	}
-	return false
-}
-
-func commentSidebarClass(initiallyExpanded bool) string {
-	base := "shrink-0 min-h-screen transition-[width] duration-150"
-	if initiallyExpanded {
-		return base + " w-80"
-	}
-	return base + " w-10"
-}
-
 func unresolvedThreads(threads []CommentThreadView) []CommentThreadView {
 	out := make([]CommentThreadView, 0, len(threads))
 	for _, thread := range threads {
@@ -477,22 +427,6 @@ func resolvedThreads(threads []CommentThreadView) []CommentThreadView {
 			out = append(out, thread)
 		}
 	}
-	return out
-}
-
-func sidebarThreadTarget(
-	base CommentTargetView,
-	thread CommentThreadView,
-) CommentTargetView {
-	out := base
-	out.SectionID = sectionOrDocument(thread.SectionID)
-	out.HeadingHint = thread.HeadingHint
-	out.Threads = []CommentThreadView{thread}
-	out.HiddenFields = MergeHidden(base.HiddenFields, map[string]string{
-		"section_hint": out.SectionID,
-		"heading_hint": out.HeadingHint,
-	})
-	out.HiddenFields = MergeHidden(out.HiddenFields, thread.HiddenFields)
 	return out
 }
 

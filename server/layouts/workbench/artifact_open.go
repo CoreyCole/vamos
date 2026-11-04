@@ -2,7 +2,6 @@ package workbench
 
 import (
 	"net/http"
-	"time"
 )
 
 // ArtifactOpenCookie stores ephemeral desktop artifact-pane visibility across
@@ -21,25 +20,6 @@ func ArtifactOpenFromRequest(r *http.Request) bool {
 		return true
 	}
 	return c.Value == "1"
-}
-
-// WriteArtifactOpenCookie persists desktop artifact visibility for later GETs.
-func WriteArtifactOpenCookie(w http.ResponseWriter, open bool) {
-	if w == nil {
-		return
-	}
-	v := "0"
-	if open {
-		v = "1"
-	}
-	http.SetCookie(w, &http.Cookie{
-		Name:     ArtifactOpenCookie,
-		Value:    v,
-		Path:     "/",
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   31536000,
-		Expires:  time.Now().Add(365 * 24 * time.Hour),
-	})
 }
 
 func artifactOpenCookieWriteJS(open bool) string {
@@ -82,10 +62,6 @@ func ArtifactToggleClickAction() string {
 
 func ArtifactHideControlTitle() string {
 	return "Close details"
-}
-
-func ArtifactShowControlTitle() string {
-	return "Open details"
 }
 
 func ArtifactToggleControlTitle() string {

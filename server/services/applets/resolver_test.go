@@ -22,7 +22,10 @@ applet:
     WORDLE_MODE: test
 ---
 `)
-	ctx, err := (Resolver{ExamplesRoot: root}).ResolveExampleApplet(context.Background(), "wordle")
+	ctx, err := (Resolver{ExamplesRoot: root}).ResolveExampleApplet(
+		context.Background(),
+		"wordle",
+	)
 	if err != nil {
 		t.Fatalf("ResolveExampleApplet() error = %v", err)
 	}
@@ -35,7 +38,8 @@ applet:
 	if ctx.RuntimeKey != "wordle" {
 		t.Fatalf("RuntimeKey = %q", ctx.RuntimeKey)
 	}
-	if ctx.RouteHref != "/examples/wordle" || ctx.IFrameSrc != "/examples/wordle/app/" || ctx.StatusURL != "/examples/wordle/status" {
+	if ctx.RouteHref != "/examples/wordle" || ctx.IFrameSrc != "/examples/wordle/app/" ||
+		ctx.StatusURL != "/examples/wordle/status" {
 		t.Fatalf("unexpected routes: %+v", ctx)
 	}
 	if ctx.Manifest.SourceDir != filepath.Join(root, "wordle", "app") {
@@ -54,7 +58,10 @@ applet:
   start_command: ["demo"]
 ---
 `)
-	ctx, err := (Resolver{ThoughtsRoot: root}).ResolveThoughtsApplet(context.Background(), "thoughts/plans/demo/applet.md")
+	ctx, err := (Resolver{ThoughtsRoot: root}).ResolveThoughtsApplet(
+		context.Background(),
+		"thoughts/plans/demo/applet.md",
+	)
 	if err != nil {
 		t.Fatalf("ResolveThoughtsApplet() error = %v", err)
 	}
@@ -68,7 +75,8 @@ applet:
 	if ctx.RuntimeKey != wantToken {
 		t.Fatalf("RuntimeKey = %q", ctx.RuntimeKey)
 	}
-	if ctx.RouteHref != "/thoughts/_render/app/"+wantToken || ctx.IFrameSrc != "/thoughts/_render/app/"+wantToken+"/app/" {
+	if ctx.RouteHref != "/thoughts/_render/app/"+wantToken ||
+		ctx.IFrameSrc != "/thoughts/_render/app/"+wantToken+"/app/" {
 		t.Fatalf("unexpected routes: %+v", ctx)
 	}
 }
@@ -84,7 +92,10 @@ applet:
   start_command: ["demo"]
 ---
 `)
-	ctx, err := (Resolver{ThoughtsRoot: root}).ResolveThoughtsApplet(context.Background(), "thoughts/plans/demo")
+	ctx, err := (Resolver{ThoughtsRoot: root}).ResolveThoughtsApplet(
+		context.Background(),
+		"thoughts/plans/demo",
+	)
 	if err != nil {
 		t.Fatalf("ResolveThoughtsApplet() error = %v", err)
 	}
@@ -96,12 +107,14 @@ applet:
 	if ctx.RuntimeKey != wantToken {
 		t.Fatalf("RuntimeKey = %q", ctx.RuntimeKey)
 	}
-	if ctx.RouteHref != "/thoughts/_render/app/"+wantToken || ctx.IFrameSrc != "/thoughts/_render/app/"+wantToken+"/app/" || ctx.StatusURL != "/thoughts/_render/app/"+wantToken+"/status" {
+	if ctx.RouteHref != "/thoughts/_render/app/"+wantToken ||
+		ctx.IFrameSrc != "/thoughts/_render/app/"+wantToken+"/app/" ||
+		ctx.StatusURL != "/thoughts/_render/app/"+wantToken+"/status" {
 		t.Fatalf("unexpected routes: %+v", ctx)
 	}
 }
 
-func TestResolverResolveThoughtsAppletToken(t *testing.T) {
+func TestResolverResolveThoughtsAppletFromEncodedIdentity(t *testing.T) {
 	root := t.TempDir()
 	writeManifest(t, filepath.Join(root, "plans", "demo", "AGENTS.md"), `---
 vamos_artifact: applet
@@ -112,12 +125,15 @@ applet:
 ---
 `)
 	identity := "thoughts/plans/demo/AGENTS.md"
-	ctx, err := (Resolver{ThoughtsRoot: root}).ResolveThoughtsAppletToken(context.Background(), EncodeAppletIdentity(identity))
+	ctx, err := (Resolver{ThoughtsRoot: root}).ResolveThoughtsApplet(
+		context.Background(),
+		identity,
+	)
 	if err != nil {
-		t.Fatalf("ResolveThoughtsAppletToken() error = %v", err)
+		t.Fatalf("ResolveThoughtsApplet() error = %v", err)
 	}
 	if ctx.IdentityPath != identity || ctx.RuntimeKey != EncodeAppletIdentity(identity) {
-		t.Fatalf("unexpected token resolution: %+v", ctx)
+		t.Fatalf("unexpected identity resolution: %+v", ctx)
 	}
 }
 
@@ -133,19 +149,30 @@ applet:
 ---
 `)
 	}
-	one, err := (Resolver{ThoughtsRoot: root}).ResolveThoughtsApplet(context.Background(), "thoughts/plans/one")
+	one, err := (Resolver{ThoughtsRoot: root}).ResolveThoughtsApplet(
+		context.Background(),
+		"thoughts/plans/one",
+	)
 	if err != nil {
 		t.Fatalf("ResolveThoughtsApplet(one) error = %v", err)
 	}
-	two, err := (Resolver{ThoughtsRoot: root}).ResolveThoughtsApplet(context.Background(), "thoughts/plans/two")
+	two, err := (Resolver{ThoughtsRoot: root}).ResolveThoughtsApplet(
+		context.Background(),
+		"thoughts/plans/two",
+	)
 	if err != nil {
 		t.Fatalf("ResolveThoughtsApplet(two) error = %v", err)
 	}
 	if one.Manifest.ID != "demo" || two.Manifest.ID != "demo" {
 		t.Fatalf("manifest IDs = %q %q", one.Manifest.ID, two.Manifest.ID)
 	}
-	if one.RuntimeKey == two.RuntimeKey || one.RuntimeKey == "demo" || two.RuntimeKey == "demo" {
-		t.Fatalf("runtime keys are not durable path keys: %q %q", one.RuntimeKey, two.RuntimeKey)
+	if one.RuntimeKey == two.RuntimeKey || one.RuntimeKey == "demo" ||
+		two.RuntimeKey == "demo" {
+		t.Fatalf(
+			"runtime keys are not durable path keys: %q %q",
+			one.RuntimeKey,
+			two.RuntimeKey,
+		)
 	}
 }
 
@@ -161,7 +188,10 @@ applet:
   start_command: ["demo"]
 ---
 `)
-	ctx, err := (Resolver{ThoughtsRoot: root}).ResolveThoughtsApplet(context.Background(), "thoughts/plans/demo")
+	ctx, err := (Resolver{ThoughtsRoot: root}).ResolveThoughtsApplet(
+		context.Background(),
+		"thoughts/plans/demo",
+	)
 	if err != nil {
 		t.Fatalf("ResolveThoughtsApplet() error = %v", err)
 	}
@@ -220,10 +250,15 @@ func TestRuntimeConfigFromManifest(t *testing.T) {
 		Env:          map[string]string{"A": "B"},
 	}}
 	cfg := RuntimeConfigFromManifest(ctx)
-	if cfg.AppID != "thoughts-token" || cfg.FilesRoot != "/files" || cfg.SourceDir != "/files/apps/demo" || cfg.HealthPath != "/healthz" || cfg.IdleTimeout != 5 {
+	if cfg.AppID != "thoughts-token" || cfg.FilesRoot != "/files" ||
+		cfg.SourceDir != "/files/apps/demo" ||
+		cfg.HealthPath != "/healthz" ||
+		cfg.IdleTimeout != 5 {
 		t.Fatalf("unexpected config: %+v", cfg)
 	}
-	if len(cfg.BuildCommand) != 2 || cfg.BuildCommand[0] != "go" || len(cfg.StartCommand) != 1 || cfg.StartCommand[0] != "demo" {
+	if len(cfg.BuildCommand) != 2 || cfg.BuildCommand[0] != "go" ||
+		len(cfg.StartCommand) != 1 ||
+		cfg.StartCommand[0] != "demo" {
 		t.Fatalf("commands not preserved: %+v", cfg)
 	}
 	if cfg.Env["A"] != "B" {
@@ -236,13 +271,15 @@ func TestRuntimeConfigFromManifest(t *testing.T) {
 }
 
 func TestRuntimeConfigFromManifestFallsBackToManifestID(t *testing.T) {
-	cfg := RuntimeConfigFromManifest(AppletContext{Manifest: AppletManifest{ID: "wordle"}})
+	cfg := RuntimeConfigFromManifest(
+		AppletContext{Manifest: AppletManifest{ID: "wordle"}},
+	)
 	if cfg.AppID != "wordle" {
 		t.Fatalf("AppID = %q", cfg.AppID)
 	}
 }
 
-func writeManifest(t *testing.T, path string, body string) {
+func writeManifest(t *testing.T, path, body string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)

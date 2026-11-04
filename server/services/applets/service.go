@@ -10,13 +10,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/a-h/templ"
+	"github.com/labstack/echo/v4"
+	"github.com/starfederation/datastar-go/datastar"
+
 	"github.com/CoreyCole/vamos/server/layouts"
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 	"github.com/CoreyCole/vamos/server/services/appletruntime"
 	"github.com/CoreyCole/vamos/server/services/commentui"
-	"github.com/a-h/templ"
-	"github.com/labstack/echo/v4"
-	"github.com/starfederation/datastar-go/datastar"
 )
 
 const (
@@ -24,7 +25,13 @@ const (
 	chatSuffix     = "chat"
 )
 
-var reservedAliasPrefixes = []string{"/api", "/forms", "/thoughts", "/agent-chat", "/static"}
+var reservedAliasPrefixes = []string{
+	"/api",
+	"/forms",
+	"/thoughts",
+	"/agent-chat",
+	"/static",
+}
 
 type Service struct {
 	resolver Resolver
@@ -43,14 +50,18 @@ type ServiceOptions struct {
 	Comments AppletCommentReader
 }
 
-func NewService() *Service { return NewHTTPService(ServiceOptions{}) }
-
 func NewHTTPService(opts ServiceOptions) *Service {
 	aliases := opts.Aliases
 	if aliases == nil {
 		aliases = appletruntime.NewAliasRegistry(reservedAliasPrefixes)
 	}
-	return &Service{resolver: opts.Resolver, manager: opts.Manager, aliases: aliases, comments: opts.Comments, aliasRoutes: map[string]struct{}{}}
+	return &Service{
+		resolver:    opts.Resolver,
+		manager:     opts.Manager,
+		aliases:     aliases,
+		comments:    opts.Comments,
+		aliasRoutes: map[string]struct{}{},
+	}
 }
 
 func (s *Service) RegisterThoughtsRoutes(g *echo.Group) {
@@ -126,7 +137,10 @@ func (s *Service) registerThoughtsStartupAliases(e *echo.Echo) error {
 		if err != nil {
 			return nil
 		}
-		ctx, err := s.resolver.ResolveThoughtsApplet(context.Background(), "thoughts/"+filepath.ToSlash(rel))
+		ctx, err := s.resolver.ResolveThoughtsApplet(
+			context.Background(),
+			"thoughts/"+filepath.ToSlash(rel),
+		)
 		if err != nil || len(ctx.Manifest.RootAliases) == 0 {
 			return nil
 		}
@@ -134,7 +148,10 @@ func (s *Service) registerThoughtsStartupAliases(e *echo.Echo) error {
 	})
 }
 
-func (s *Service) registerAppletAliasesDuringStartup(e *echo.Echo, ctx AppletContext) error {
+func (s *Service) registerAppletAliasesDuringStartup(
+	e *echo.Echo,
+	ctx AppletContext,
+) error {
 	reg := aliasRegistration(ctx)
 	if len(reg.Aliases) == 0 {
 		return nil
@@ -163,14 +180,25 @@ func (s *Service) registerAliasRouteLocked(e *echo.Echo, alias appletruntime.Rou
 	e.Any(route, s.HandleAlias)
 }
 
-func BuildWorkbenchState(_ context.Context, state WorkbenchState) workbench.WorkbenchState {
+func BuildWorkbenchState(
+	_ context.Context,
+	state WorkbenchState,
+) workbench.WorkbenchState {
 	appID := strings.TrimSpace(state.Config.ID)
 	if appID == "" {
 		appID = "applet"
 	}
 
-	filesTitle := firstNonEmpty(state.Files.Title, state.Config.UserLabels.FilesTitle, "Files")
-	chatTitle := firstNonEmpty(state.Chat.Title, state.Config.UserLabels.ChatTitle, "Chat")
+	filesTitle := firstNonEmpty(
+		state.Files.Title,
+		state.Config.UserLabels.FilesTitle,
+		"Files",
+	)
+	chatTitle := firstNonEmpty(
+		state.Chat.Title,
+		state.Config.UserLabels.ChatTitle,
+		"Chat",
+	)
 
 	files := state.Files.Component
 	if files == nil {
@@ -222,8 +250,20 @@ func BuildWorkbenchState(_ context.Context, state WorkbenchState) workbench.Work
 			Page:    workbench.WorkbenchPageAgentChat,
 			View:    workbench.WorkbenchViewSplit,
 			Regions: []workbench.RegionSpec{
-				{ID: filesRegionID, Slot: workbench.WorkbenchSlotPrimary, Kind: workbench.RegionDoc, Ratio: 0.62, Visible: true},
-				{ID: chatRegionID, Slot: workbench.WorkbenchSlotContext, Kind: workbench.RegionChat, Ratio: 0.38, Visible: true},
+				{
+					ID:      filesRegionID,
+					Slot:    workbench.WorkbenchSlotPrimary,
+					Kind:    workbench.RegionDoc,
+					Ratio:   0.62,
+					Visible: true,
+				},
+				{
+					ID:      chatRegionID,
+					Slot:    workbench.WorkbenchSlotContext,
+					Kind:    workbench.RegionChat,
+					Ratio:   0.38,
+					Visible: true,
+				},
 			},
 			Mobile: workbench.MobileSpec{ActiveRegionID: mobileActive},
 		},
@@ -247,15 +287,27 @@ func (s *Service) HandleAppletPage(c echo.Context) error {
 	return s.RenderAppletPage(c, applet, process)
 }
 
-func (s *Service) RenderAppletPage(c echo.Context, applet AppletContext, process appletruntime.AppletProcessState) error {
+func (s *Service) RenderAppletPage(
+	c echo.Context,
+	applet AppletContext,
+	process appletruntime.AppletProcessState,
+) error {
 	userEmail := appletUserEmail(c)
 	commentsPanel := EmptyRegion("Comments will appear here.")
 	var commentUI commentui.CommentableMarkdownArgs
-	if ui, ok, err := AppletCommentUI(c.Request().Context(), applet, userEmail, s.comments); err != nil {
-		c.Logger().Warnf("Failed to load applet comments for %s: %v", applet.IdentityPath, err)
+	if ui, ok, err := AppletCommentUI(
+		c.Request().Context(),
+		applet,
+		userEmail,
+		s.comments,
+	); err != nil {
+		c.Logger().
+			Warnf("Failed to load applet comments for %s: %v", applet.IdentityPath, err)
 	} else if ok {
 		commentUI = ui
-		commentsPanel = commentui.CommentsContextPanel(commentui.BuildCommentsPanelArgs(ui, ""))
+		commentsPanel = commentui.CommentsContextPanel(
+			commentui.BuildCommentsPanelArgs(ui, ""),
+		)
 	}
 	rootArgs := layouts.RootArgs{
 		Title:             applet.Manifest.Title + " Applet",
@@ -267,29 +319,46 @@ func (s *Service) RenderAppletPage(c echo.Context, applet AppletContext, process
 	}
 	if strings.HasPrefix(applet.IdentityPath, "thoughts/") {
 		state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
-			UserEmail:     userEmail,
-			ViewportClass: workbench.ResolveViewportClass(c.Request().Header, c.Request().UserAgent()),
-			Threads:       EmptyRegion("Threads will appear here."),
-			Chat:          EmptyRegion("Chat will appear here."),
-			Artifact:      ThoughtsAppletArtifactPane(applet, process, commentUI),
-			Comments:      commentsPanel,
-			ArtifactOpen:  true,
-			CommentsOpen:  workbench.CommentsOpenFromRequest(c.Request()),
+			UserEmail: userEmail,
+			ViewportClass: workbench.ResolveViewportClass(
+				c.Request().Header,
+				c.Request().UserAgent(),
+			),
+			Threads:      EmptyRegion("Threads will appear here."),
+			Chat:         EmptyRegion("Chat will appear here."),
+			Artifact:     ThoughtsAppletArtifactPane(applet, process, commentUI),
+			Comments:     commentsPanel,
+			ArtifactOpen: true,
+			CommentsOpen: workbench.CommentsOpenFromRequest(c.Request()),
 		})
 		if err != nil {
 			return err
 		}
-		return layouts.Root(rootArgs).Render(templ.WithChildren(c.Request().Context(), workbench.Workbench(state)), c.Response().Writer)
+		return layouts.Root(rootArgs).
+			Render(templ.WithChildren(c.Request().Context(), workbench.Workbench(state)), c.Response().Writer)
 	}
 	state, err := BuildAppletWorkbenchState(AppletWorkbenchInput{
-		UserEmail: userEmail, Context: applet, Process: process, CommentUI: commentUI,
-		Sidebar:   workbench.WorkbenchSidebarArgs{Tabs: workbench.DefaultSidebarTabs(), Files: workbench.FilesPanelModel{CurrentPath: applet.IdentityPath}, Workspaces: workbench.WorkspacesPanelModel{EmptyLabel: "Workspaces will appear here."}},
-		RightRail: workbench.RightRailArgs{Chat: EmptyRegion("Chat will appear here."), Comments: commentsPanel},
+		UserEmail: userEmail,
+		Context:   applet,
+		Process:   process,
+		CommentUI: commentUI,
+		Sidebar: workbench.WorkbenchSidebarArgs{
+			Tabs:  workbench.DefaultSidebarTabs(),
+			Files: workbench.FilesPanelModel{CurrentPath: applet.IdentityPath},
+			Workspaces: workbench.WorkspacesPanelModel{
+				EmptyLabel: "Workspaces will appear here.",
+			},
+		},
+		RightRail: workbench.RightRailArgs{
+			Chat:     EmptyRegion("Chat will appear here."),
+			Comments: commentsPanel,
+		},
 	})
 	if err != nil {
 		return err
 	}
-	return layouts.Root(rootArgs).Render(templ.WithChildren(c.Request().Context(), workbench.Workbench(state)), c.Response().Writer)
+	return layouts.Root(rootArgs).
+		Render(templ.WithChildren(c.Request().Context(), workbench.Workbench(state)), c.Response().Writer)
 }
 
 func (s *Service) HandleAppletStatus(c echo.Context) error {
@@ -305,7 +374,8 @@ func (s *Service) HandleAppletStatus(c echo.Context) error {
 	var lastStatus appletruntime.ProcessStatus
 	for {
 		process := s.currentProcess(c.Request().Context(), applet)
-		if !triggeredStart && (shouldDemandStartFromStatus(process) || shouldRestartFromStatus(process)) {
+		if !triggeredStart &&
+			(shouldDemandStartFromStatus(process) || shouldRestartFromStatus(process)) {
 			triggeredStart = true
 			s.EnsureAppletAsync(c.Request().Context(), applet, process)
 		}
@@ -407,7 +477,10 @@ func (s *Service) HandleAppletRestart(c echo.Context) error {
 		return err
 	}
 	_ = s.manager.Stop(c.Request().Context(), applet.RuntimeKey)
-	if _, err := s.manager.EnsureStarted(c.Request().Context(), RuntimeConfigFromManifest(applet)); err != nil {
+	if _, err := s.manager.EnsureStarted(
+		c.Request().Context(),
+		RuntimeConfigFromManifest(applet),
+	); err != nil {
 		return echo.NewHTTPError(http.StatusBadGateway, err.Error())
 	}
 	return c.Redirect(http.StatusSeeOther, applet.RouteHref)
@@ -421,7 +494,11 @@ func shouldRestartFromStatus(process appletruntime.AppletProcessState) bool {
 	return process.Status == appletruntime.ProcessStatusUnhealthy
 }
 
-func (s *Service) EnsureAppletAsync(ctx context.Context, applet AppletContext, process appletruntime.AppletProcessState) {
+func (s *Service) EnsureAppletAsync(
+	ctx context.Context,
+	applet AppletContext,
+	process appletruntime.AppletProcessState,
+) {
 	if s.manager == nil {
 		return
 	}
@@ -445,19 +522,30 @@ func (s *Service) resolveAppletFromRequest(c echo.Context) (AppletContext, error
 		return s.resolver.ResolveExampleApplet(c.Request().Context(), token)
 	}
 	if s.resolver.ThoughtsRoot != "" {
-		if docPath := strings.TrimSpace(firstNonEmpty(c.QueryParam("doc_path"), c.QueryParam("path"))); docPath != "" {
+		if docPath := strings.TrimSpace(
+			firstNonEmpty(c.QueryParam("doc_path"), c.QueryParam("path")),
+		); docPath != "" {
 			return s.resolver.ResolveThoughtsApplet(c.Request().Context(), docPath)
 		}
 	}
 	id := strings.TrimSpace(c.Param("id"))
 	if id == "" {
-		return AppletContext{}, echo.NewHTTPError(http.StatusBadRequest, "applet identity is required")
+		return AppletContext{}, echo.NewHTTPError(
+			http.StatusBadRequest,
+			"applet identity is required",
+		)
 	}
 	return s.resolver.ResolveExampleApplet(c.Request().Context(), id)
 }
 
-func (s *Service) resolveAppletFromRuntimeKey(ctx context.Context, runtimeKey string) (AppletContext, error) {
-	if identity, err := DecodeAppletIdentity(runtimeKey); err == nil && strings.HasPrefix(identity, "thoughts/") && s.resolver.ThoughtsRoot != "" {
+func (s *Service) resolveAppletFromRuntimeKey(
+	ctx context.Context,
+	runtimeKey string,
+) (AppletContext, error) {
+	if identity, err := DecodeAppletIdentity(
+		runtimeKey,
+	); err == nil && strings.HasPrefix(identity, "thoughts/") &&
+		s.resolver.ThoughtsRoot != "" {
 		return s.resolver.ResolveThoughtsApplet(ctx, identity)
 	}
 	return s.resolver.ResolveExampleApplet(ctx, runtimeKey)
@@ -470,8 +558,14 @@ func appletUserEmail(c echo.Context) string {
 	return ""
 }
 
-func (s *Service) currentProcess(ctx context.Context, applet AppletContext) appletruntime.AppletProcessState {
-	stopped := appletruntime.AppletProcessState{AppID: applet.RuntimeKey, Status: appletruntime.ProcessStatusStopped}
+func (s *Service) currentProcess(
+	ctx context.Context,
+	applet AppletContext,
+) appletruntime.AppletProcessState {
+	stopped := appletruntime.AppletProcessState{
+		AppID:  applet.RuntimeKey,
+		Status: appletruntime.ProcessStatusStopped,
+	}
 	if s.manager == nil {
 		return stopped
 	}
@@ -505,14 +599,21 @@ func (s *Service) ensure(c echo.Context, applet AppletContext) error {
 	if shouldRestartFromStatus(process) {
 		_ = s.manager.Stop(ctx, applet.RuntimeKey)
 	}
-	if _, err := s.manager.EnsureStarted(ctx, RuntimeConfigFromManifest(applet)); err != nil {
+	if _, err := s.manager.EnsureStarted(
+		ctx,
+		RuntimeConfigFromManifest(applet),
+	); err != nil {
 		return echo.NewHTTPError(http.StatusBadGateway, err.Error())
 	}
 	return nil
 }
 
 func proxyOptions() appletruntime.ProxyOptions {
-	return appletruntime.ProxyOptions{FlushSSE: true, RewriteCookiePath: true, AllowNullOriginCORS: true}
+	return appletruntime.ProxyOptions{
+		FlushSSE:            true,
+		RewriteCookiePath:   true,
+		AllowNullOriginCORS: true,
+	}
 }
 
 func setAppletCORS(header http.Header) {
@@ -525,7 +626,10 @@ func setAppletCORS(header http.Header) {
 func aliasRegistration(ctx AppletContext) appletruntime.AliasRegistration {
 	aliases := make([]appletruntime.RouteAlias, 0, len(ctx.Manifest.RootAliases))
 	for _, alias := range ctx.Manifest.RootAliases {
-		aliases = append(aliases, appletruntime.RouteAlias{Pattern: alias.Pattern, Methods: alias.Methods})
+		aliases = append(
+			aliases,
+			appletruntime.RouteAlias{Pattern: alias.Pattern, Methods: alias.Methods},
+		)
 	}
 	return appletruntime.AliasRegistration{AppID: ctx.RuntimeKey, Aliases: aliases}
 }

@@ -139,20 +139,3 @@ func v2Region(
 		Ratio: ratio, MinRem: minRem, Visible: visible, Component: component,
 	}
 }
-
-func threadsRegionVisible(state WorkbenchState) bool {
-	for _, region := range state.Regions {
-		if region.ID == WorkbenchV2ThreadsRegionID {
-			return region.Visible
-		}
-	}
-	return false
-}
-
-func WorkbenchV2(args WorkbenchV2Args) templ.Component {
-	state, err := BuildWorkbenchV2State(args)
-	if err != nil {
-		return templ.NopComponent
-	}
-	return Workbench(state)
-}

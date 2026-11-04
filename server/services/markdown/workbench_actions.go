@@ -228,17 +228,3 @@ func BuildChatHeaderOverflow(
 		}},
 	})
 }
-
-// DocumentCopyPathAction remains for callers that still need a path-only copy.
-// Share menus use ShareArtifactAction instead (no composer append).
-func DocumentCopyPathAction(docPath string) workbench.OverflowAction {
-	path := thoughtsClipboardPath(docPath)
-	return workbench.OverflowAction{
-		Label:       "Copy path",
-		Description: "Copy path and attach in chat",
-		Kind:        workbench.OverflowActionButton,
-		ClientAction: "const p='" + escapeJSSingleQuoted(
-			path,
-		) + "'; navigator.clipboard?.writeText(p); const input = document.getElementById('agent-chat-composer-input'); if (input) { input.value += (input.value ? '\\n' : '') + p; input.dispatchEvent(new Event('input', {bubbles: true})); } " + closeOverflowMenuExpr(),
-	}
-}

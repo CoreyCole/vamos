@@ -183,29 +183,6 @@ func ThoughtsDocURL(docPath, hash string) string {
 	return url
 }
 
-func PreserveEmbeddedChatQuery(
-	base string,
-	selection DocumentEmbeddedChatSelection,
-) string {
-	state := ThoughtsWorkbenchLinkState{
-		Context:         thoughtsContextModeChat,
-		ChatWorkspaceID: selection.WorkspaceID,
-		ChatThreadID:    selection.ThreadID,
-		ChatRunID:       selection.RunID,
-	}
-	if strings.TrimSpace(selection.ThreadID) != "" {
-		state.ChatWorkspaceID = ""
-	}
-	return state.Preserve(base)
-}
-
-func ThoughtsDocURLWithChatState(
-	docPath, hash string,
-	selection DocumentEmbeddedChatSelection,
-) string {
-	return PreserveEmbeddedChatQuery(ThoughtsDocURL(docPath, hash), selection)
-}
-
 func ThoughtsDirURL(dirPath string) string {
 	canonical := CanonicalThoughtsDirPathLoose(dirPath)
 	if canonical == "" {
