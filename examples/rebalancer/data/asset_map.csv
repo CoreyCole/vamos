@@ -1,0 +1,12 @@
+Symbol,Name,Asset Class,Liquidity Rank,Allows Fractional,Buy Proxy
+FNILX,Fidelity ZERO Large Cap Index,US Equity,3,1,
+FZILX,Fidelity ZERO International Index,Intl Equity,3,1,
+VGK,Vanguard FTSE Europe ETF,Intl Equity,3,0,
+IAU,iShares Gold Trust,Gold,3,0,
+NUKZ,NukeEnergyFund ETF,Thematic Equity,4,0,
+SHLD,ShieldAI Growth Fund,Thematic Equity,4,0,
+BIL,SPDR Bloomberg 1-3 Month T-Bill,Short Duration,2,0,
+SPAXX,Fidelity Government Money Market,Cash,1,1,
+FZFXX,Fidelity Treasury Money Market,Cash,1,1,
+FRGXX,Fidelity Government Cash Reserves,Cash,1,1,
+FCASH,Fidelity Cash Account,Cash,0,1,
