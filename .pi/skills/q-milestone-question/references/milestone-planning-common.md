@@ -93,7 +93,7 @@ Expected shape:
 - milestone sequence with provider milestone links when available; use the issue-list milestone URL shape from the thoughts root `AGENTS.md` host manifest, not hard-coded URLs
 - one proposed-work table per milestone
 - table rows as planning inputs with columns like `Proposed work | Critical-path outcome | Notes | Linear`
-- deployed E2E/Ranger verification as separate proposed-work rows, not hidden in a column
+- deployed E2E verification as separate proposed-work rows, not hidden in a column
 - final readiness/backstop table only for explicitly named leftover polish or edge-to-edge completeness
 - source index linking canonical research, brainstorms, source docs, and Linear comments
 
@@ -103,7 +103,7 @@ Rules:
 - Put decision reasoning, alternatives, and in-progress debate in `context/brainstorms/` or research docs.
 - Do not treat proposed-work rows as final ticket boundaries. Milestone `design.md` and `/q-milestone-create-tickets` decide final ticket count and titles.
 - Do not create implementation tickets directly from the high-level spec table.
-- Each plan/product milestone should own the deployed E2E/Ranger proof needed for that milestone unless the lead explicitly creates a shared verification milestone.
+- Each plan/product milestone should own the deployed E2E proof needed for that milestone unless the lead explicitly creates a shared verification milestone.
 
 ## Vertical milestone rule
 

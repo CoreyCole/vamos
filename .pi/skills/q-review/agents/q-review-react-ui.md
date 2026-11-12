@@ -22,7 +22,7 @@ Before judging React UI changes, look for and read project-local guidance when i
 - `frontend/apps/nationwide/AGENTS.md` when Nationwide UI or browser auth is touched
 - `frontend/apps/web/tests/AGENTS.md` when Playwright tests or browser automation are touched
 - `frontend/packages/bonsai-ui/AGENTS.md` and nearby `AGENTS.md` when shared Bonsai components are touched
-- `.agents/skills/cn-ranger/SKILL.md` and relevant `start.md`/`verify.md`/`feedback.md` for UI feature review and browser verification expectations
+- `.agents/skills/check-ui/SKILL.md` for UI feature review and browser verification expectations
 - `.agents/skills/figma-cli/SKILL.md` when implementation is supposed to match Figma design data
 - `.agents/skills/playwright-cli/SKILL.md` when browser automation or UI verification is relevant
 - `.agents/rules/error-visibility-patterns.md` for activity/issues or integrations UI error display
@@ -56,7 +56,7 @@ Review only this lane unless you find a critical issue that another lane might m
 
 - Are React UI states, data flow, forms, tables, feature flags, error surfaces, accessibility, and browser verification planned concretely?
 - Does the plan name the relevant Chestnut frontend guidance (`frontend/apps/AGENTS.md`, app-specific `AGENTS.md`, Bonsai docs, Playwright auth docs) when those conventions matter?
-- Are design/Figma/Ranger/Playwright acceptance scenarios represented when relevant?
+- Are design/Figma/Playwright acceptance scenarios represented when relevant?
 - Are proposed tests focused on business logic or pure transforms instead of brittle component-library interactions?
 
 ### Implementation review checks
@@ -64,7 +64,7 @@ Review only this lane unless you find a critical issue that another lane might m
 - Does the React UI implement the planned behavior and match adjacent monorepo conventions?
 - Are interactive flows correct under loading, failure, permissions, empty data, repeated actions, and route/search-param changes?
 - Are forms, dialogs, mutation callbacks, tables, and enum selects implemented using the established Chestnut patterns?
-- Are required browser/Ranger/Playwright verification steps present or still missing?
+- Are required browser/Playwright verification steps present or still missing?
 
 ## Process
 

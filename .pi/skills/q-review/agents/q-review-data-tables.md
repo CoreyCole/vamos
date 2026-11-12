@@ -20,7 +20,7 @@ Before judging table changes, look for and read project-local guidance when it e
 - `.agents/skills/writing-sql-queries/SKILL.md` for SQL-backed table queries
 - `.agents/rules/postgresql-db-schema.md` for DB/schema exploration rules
 - `.agents/skills/temporal-workflows/SKILL.md` when exports use Temporal workflows
-- `.agents/skills/cn-ranger/SKILL.md` when table UX/browser verification is relevant
+- `.agents/skills/check-ui/SKILL.md` when table UX/browser verification is relevant
 - Local docs and adjacent table implementations in the same navigation section
 
 If local guidance conflicts with this prompt, local project guidance wins.
